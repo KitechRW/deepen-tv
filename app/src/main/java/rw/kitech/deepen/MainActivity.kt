@@ -314,15 +314,44 @@ private fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                Text(
-                    text = "Dr. Paul Gitwaza · oldest → newest",
-                    color = DeepenMuted,
-                    fontSize = 14.sp,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 28.dp, height = 20.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFFF0033)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "▶",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column {
+                        Text(
+                            text = "Dr. Paul Gitwaza",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "@drpaulmgitwaza",
+                            color = DeepenMuted,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(34.dp))
 
                 Box(
                     modifier = Modifier
