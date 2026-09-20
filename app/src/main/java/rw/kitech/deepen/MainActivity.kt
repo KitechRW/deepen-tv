@@ -15,6 +15,7 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,8 +43,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -257,11 +261,8 @@ private fun HomeScreen(
             .fillMaxSize()
             .background(DeepenBackground),
     ) {
-        Image(
-            painter = painterResource(R.drawable.deepen_home_hero),
-            contentDescription = null,
+        DeepenHeroBackground(
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
         )
 
         Box(
@@ -509,6 +510,165 @@ private fun HomeScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DeepenHeroBackground(
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val horizon = Offset(w * 0.76f, h * 0.53f)
+
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF030711),
+                    Color(0xFF071A36),
+                    Color(0xFF0B4FA8),
+                    Color(0xFF082A5A),
+                ),
+                start = Offset(0f, 0f),
+                end = Offset(w, h),
+            ),
+        )
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFDDF8FF).copy(alpha = 0.95f),
+                    Color(0xFF54C9FF).copy(alpha = 0.58f),
+                    Color(0xFF1A79FF).copy(alpha = 0.18f),
+                    Color.Transparent,
+                ),
+                center = horizon,
+                radius = w * 0.34f,
+            ),
+            radius = w * 0.34f,
+            center = horizon,
+        )
+
+        val archFractions = listOf(0.34f, 0.27f, 0.205f, 0.145f)
+        archFractions.forEachIndexed { index, fraction ->
+            val radiusX = w * fraction
+            val radiusY = radiusX * 0.78f
+            val left = horizon.x - radiusX
+            val top = horizon.y - radiusY
+            val archSize = androidx.compose.ui.geometry.Size(radiusX * 2f, radiusY * 2f)
+            val baseY = h * (0.86f - index * 0.018f)
+
+            drawArc(
+                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(left, top),
+                size = archSize,
+                style = Stroke(width = 18f + index * 2f),
+            )
+            drawArc(
+                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(left, top),
+                size = archSize,
+                style = Stroke(width = 3.2f),
+            )
+
+            val leftLegX = horizon.x - radiusX
+            val rightLegX = horizon.x + radiusX
+
+            drawLine(
+                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
+                start = Offset(leftLegX, horizon.y),
+                end = Offset(leftLegX, baseY),
+                strokeWidth = 18f + index * 2f,
+            )
+            drawLine(
+                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
+                start = Offset(rightLegX, horizon.y),
+                end = Offset(rightLegX, baseY),
+                strokeWidth = 18f + index * 2f,
+            )
+            drawLine(
+                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
+                start = Offset(leftLegX, horizon.y),
+                end = Offset(leftLegX, baseY),
+                strokeWidth = 3.2f,
+            )
+            drawLine(
+                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
+                start = Offset(rightLegX, horizon.y),
+                end = Offset(rightLegX, baseY),
+                strokeWidth = 3.2f,
+            )
+        }
+
+        val path = Path().apply {
+            moveTo(horizon.x - w * 0.012f, horizon.y + h * 0.018f)
+            lineTo(w * 0.46f, h)
+            lineTo(w * 0.98f, h)
+            lineTo(horizon.x + w * 0.012f, horizon.y + h * 0.018f)
+            close()
+        }
+        drawPath(
+            path = path,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFBDF7FF).copy(alpha = 0.54f),
+                    Color(0xFF1686E8).copy(alpha = 0.32f),
+                    Color(0xFF071B34).copy(alpha = 0.72f),
+                ),
+                startY = horizon.y,
+                endY = h,
+            ),
+        )
+
+        val leftEdge = Offset(w * 0.46f, h)
+        val rightEdge = Offset(w * 0.98f, h)
+        listOf(leftEdge, rightEdge).forEach { edge ->
+            drawLine(
+                color = Color(0xFF43C9FF).copy(alpha = 0.18f),
+                start = horizon,
+                end = edge,
+                strokeWidth = 14f,
+            )
+            drawLine(
+                color = Color(0xFFB9F6FF).copy(alpha = 0.78f),
+                start = horizon,
+                end = edge,
+                strokeWidth = 2.4f,
+            )
+        }
+
+        listOf(0.64f, 0.72f, 0.81f, 0.91f).forEachIndexed { index, yFraction ->
+            val y = h * yFraction
+            drawLine(
+                color = Color(0xFF73D8FF).copy(alpha = 0.12f - index * 0.015f),
+                start = Offset(w * 0.40f, y),
+                end = Offset(w, y),
+                strokeWidth = 1.5f,
+            )
+        }
+
+        val stars = listOf(
+            0.58f to 0.14f,
+            0.67f to 0.20f,
+            0.84f to 0.11f,
+            0.91f to 0.27f,
+            0.73f to 0.09f,
+            0.96f to 0.17f,
+        )
+        stars.forEachIndexed { index, (x, y) ->
+            drawCircle(
+                color = Color.White.copy(alpha = 0.35f + index * 0.05f),
+                radius = 1.4f + (index % 2) * 0.7f,
+                center = Offset(w * x, h * y),
+            )
         }
     }
 }
