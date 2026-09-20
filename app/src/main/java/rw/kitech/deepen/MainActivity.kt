@@ -14,6 +14,7 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,8 +41,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -168,6 +173,21 @@ private fun DeepenApp() {
                     }
                 }
             },
+            onSkip = { videoId ->
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        store.markCompleted(videoId)
+                    }
+
+                    refreshLocalState()
+
+                    if (currentVideo != null) {
+                        playerVideo = currentVideo
+                    } else {
+                        playerVideo = null
+                    }
+                }
+            },
             onExit = {
                 playerVideo = null
                 scope.launch {
@@ -219,11 +239,34 @@ private fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DeepenBackground)
-            .padding(horizontal = 64.dp, vertical = 48.dp),
+            .background(DeepenBackground),
     ) {
-        Column(
+        Image(
+            painter = painterResource(R.drawable.deepen_home_hero),
+            contentDescription = null,
             modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.32f,
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            DeepenBackground.copy(alpha = 0.96f),
+                            DeepenBackground.copy(alpha = 0.76f),
+                            DeepenBackground.copy(alpha = 0.90f),
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 64.dp, vertical = 48.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
@@ -389,6 +432,7 @@ private fun PlayerScreen(
     video: VideoItem,
     onProgress: (String, Double, Double) -> Unit,
     onEnded: (String) -> Unit,
+    onSkip: (String) -> Unit,
     onExit: () -> Unit,
 ) {
     var playbackPosition by remember(video.videoId) {
@@ -415,6 +459,15 @@ private fun PlayerScreen(
     var controlFeedback by remember(video.videoId) {
         mutableStateOf<String?>(null)
     }
+    var pendingSeekSeconds by remember(video.videoId) {
+        mutableStateOf(0)
+    }
+    var skipArmed by remember(video.videoId) {
+        mutableStateOf(false)
+    }
+    var skipArmPulse by remember(video.videoId) {
+        mutableStateOf(0)
+    }
 
     LaunchedEffect(playbackState, controlPulse) {
         if (playbackState == "PLAYING") {
@@ -429,6 +482,14 @@ private fun PlayerScreen(
         if (controlPulse > 0) {
             delay(900)
             controlFeedback = null
+            pendingSeekSeconds = 0
+        }
+    }
+
+    LaunchedEffect(skipArmPulse) {
+        if (skipArmed) {
+            delay(2500)
+            skipArmed = false
         }
     }
 
@@ -498,14 +559,64 @@ private fun PlayerScreen(
                 onControl = { action ->
                     overlayVisible = true
                     controlPulse += 1
-                    controlFeedback = when (action) {
-                        "SEEK_BACK" -> "−10s"
-                        "SEEK_FORWARD" -> "+30s"
-                        "TOGGLE" -> if (playbackState == "PLAYING") "Pause" else "Play"
-                        "PLAY" -> "Play"
-                        "PAUSE" -> "Pause"
-                        "SHOW" -> null
-                        else -> null
+
+                    when (action) {
+                        "SEEK_BACK" -> {
+                            skipArmed = false
+                            pendingSeekSeconds -= 10
+                            controlFeedback = if (pendingSeekSeconds < 0) {
+                                "−" + abs(pendingSeekSeconds) + "s"
+                            } else {
+                                "+" + pendingSeekSeconds + "s"
+                            }
+                        }
+
+                        "SEEK_FORWARD" -> {
+                            skipArmed = false
+                            pendingSeekSeconds += 30
+                            controlFeedback = if (pendingSeekSeconds < 0) {
+                                "−" + abs(pendingSeekSeconds) + "s"
+                            } else {
+                                "+" + pendingSeekSeconds + "s"
+                            }
+                        }
+
+                        "SKIP" -> {
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                            if (skipArmed) {
+                                skipArmed = false
+                                persistProgress()
+                                onSkip(video.videoId)
+                            } else {
+                                skipArmed = true
+                                skipArmPulse += 1
+                            }
+                        }
+
+                        "TOGGLE" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = if (playbackState == "PLAYING") "Pause" else "Play"
+                        }
+
+                        "PLAY" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = "Play"
+                        }
+
+                        "PAUSE" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = "Pause"
+                        }
+
+                        "SHOW" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                        }
                     }
                 },
                 onEnded = { videoId ->
@@ -513,6 +624,47 @@ private fun PlayerScreen(
                     onEnded(videoId)
                 },
             )
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.deepen_icon),
+                contentDescription = "Deepen",
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(9.dp)),
+                contentScale = ContentScale.Crop,
+                alpha = 0.78f,
+            )
+            Spacer(modifier = Modifier.width(9.dp))
+            Text(
+                text = "DEEPEN",
+                color = Color.White.copy(alpha = 0.78f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        if (skipArmed) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.82f))
+                    .padding(horizontal = 28.dp, vertical = 18.dp),
+            ) {
+                Text(
+                    text = "Press ↓ again to mark viewed & skip",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
 
         controlFeedback?.let { message ->
@@ -637,7 +789,7 @@ private fun PlayerScreen(
                     )
 
                     Text(
-                        text = "OK Play/Pause  ·  ← 10s  ·  → 30s  ·  Back",
+                        text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Controls  ·  ↓ Skip  ·  Back",
                         color = DeepenMuted,
                         fontSize = 13.sp,
                     )
@@ -678,8 +830,10 @@ private fun YouTubePlayer(
                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                 AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "SEEK_FORWARD"
 
-                AndroidKeyEvent.KEYCODE_DPAD_UP,
-                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> "SHOW"
+                AndroidKeyEvent.KEYCODE_DPAD_UP -> "SHOW"
+
+                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                AndroidKeyEvent.KEYCODE_MEDIA_NEXT -> "SKIP"
 
                 else -> null
             }
@@ -695,8 +849,8 @@ private fun YouTubePlayer(
                         "TOGGLE" -> "togglePlayback();"
                         "PLAY" -> "playVideo();"
                         "PAUSE" -> "pauseVideo();"
-                        "SEEK_BACK" -> "seekBy(-10);"
-                        "SEEK_FORWARD" -> "seekBy(30);"
+                        "SEEK_BACK" -> "queueSeekBy(-10);"
+                        "SEEK_FORWARD" -> "queueSeekBy(30);"
                         else -> ""
                     }
 
@@ -861,6 +1015,9 @@ private fun youtubePlayerHtml(
             <script>
                 var player;
                 var progressTimer;
+                var pendingSeekDelta = 0;
+                var pendingSeekBase = null;
+                var seekCommitTimer = null;
 
                 function onYouTubeIframeAPIReady() {
                     player = new YT.Player('player', {
@@ -988,18 +1145,36 @@ private fun youtubePlayerHtml(
                     }
                 }
 
-                function seekBy(seconds) {
-                    if (!player || typeof player.getCurrentTime !== 'function') return;
+                function commitQueuedSeek() {
+                    if (!player || pendingSeekBase === null) return;
 
-                    var current = player.getCurrentTime() || 0;
                     var duration = player.getDuration() || 0;
-                    var target = Math.max(0, current + seconds);
+                    var target = Math.max(0, pendingSeekBase + pendingSeekDelta);
 
                     if (duration > 0) {
                         target = Math.min(duration, target);
                     }
 
                     player.seekTo(target, true);
+                    pendingSeekDelta = 0;
+                    pendingSeekBase = null;
+                    seekCommitTimer = null;
+                }
+
+                function queueSeekBy(seconds) {
+                    if (!player || typeof player.getCurrentTime !== 'function') return;
+
+                    if (pendingSeekBase === null) {
+                        pendingSeekBase = player.getCurrentTime() || 0;
+                    }
+
+                    pendingSeekDelta += seconds;
+
+                    if (seekCommitTimer) {
+                        clearTimeout(seekCommitTimer);
+                    }
+
+                    seekCommitTimer = setTimeout(commitQueuedSeek, 420);
                 }
             </script>
         </body>
