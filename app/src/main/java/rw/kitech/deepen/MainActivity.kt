@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -47,6 +48,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -185,6 +187,17 @@ private fun DeepenApp() {
                         playerVideo = currentVideo
                     } else {
                         playerVideo = null
+                    }
+                }
+            },
+            onPrevious = { videoId ->
+                scope.launch {
+                    val previous = withContext(Dispatchers.IO) {
+                        store.previousVideo(videoId)
+                    }
+
+                    if (previous != null) {
+                        playerVideo = previous.copy(progressSeconds = 0.0)
                     }
                 }
             },
@@ -433,6 +446,7 @@ private fun PlayerScreen(
     onProgress: (String, Double, Double) -> Unit,
     onEnded: (String) -> Unit,
     onSkip: (String) -> Unit,
+    onPrevious: (String) -> Unit,
     onExit: () -> Unit,
 ) {
     var playbackPosition by remember(video.videoId) {
@@ -467,6 +481,9 @@ private fun PlayerScreen(
     }
     var skipArmPulse by remember(video.videoId) {
         mutableStateOf(0)
+    }
+    var lastUpPressAt by remember(video.videoId) {
+        mutableStateOf(0L)
     }
 
     LaunchedEffect(playbackState, controlPulse) {
@@ -559,74 +576,86 @@ private fun PlayerScreen(
                 onControl = { action ->
                     controlPulse += 1
 
-                    if (action == "HIDE") {
+                    if (action == "UP") {
+                        val now = SystemClock.elapsedRealtime()
+                        val isDoubleUp =
+                            lastUpPressAt > 0L &&
+                            now - lastUpPressAt <= 500L
+
                         overlayVisible = false
                         skipArmed = false
                         pendingSeekSeconds = 0
                         controlFeedback = null
+
+                        if (isDoubleUp) {
+                            lastUpPressAt = 0L
+                            persistProgress()
+                            onPrevious(video.videoId)
+                        } else {
+                            lastUpPressAt = now
+                        }
                     } else {
                         overlayVisible = true
-                    }
+                        lastUpPressAt = 0L
 
-                    when (action) {
-                        "SEEK_BACK" -> {
-                            skipArmed = false
-                            pendingSeekSeconds -= 10
-                            controlFeedback = if (pendingSeekSeconds < 0) {
-                                "−" + abs(pendingSeekSeconds) + "s"
-                            } else {
-                                "+" + pendingSeekSeconds + "s"
-                            }
-                        }
-
-                        "SEEK_FORWARD" -> {
-                            skipArmed = false
-                            pendingSeekSeconds += 30
-                            controlFeedback = if (pendingSeekSeconds < 0) {
-                                "−" + abs(pendingSeekSeconds) + "s"
-                            } else {
-                                "+" + pendingSeekSeconds + "s"
-                            }
-                        }
-
-                        "SKIP" -> {
-                            pendingSeekSeconds = 0
-                            controlFeedback = null
-                            if (skipArmed) {
+                        when (action) {
+                            "SEEK_BACK" -> {
                                 skipArmed = false
-                                persistProgress()
-                                onSkip(video.videoId)
-                            } else {
-                                skipArmed = true
-                                skipArmPulse += 1
+                                pendingSeekSeconds -= 10
+                                controlFeedback = if (pendingSeekSeconds < 0) {
+                                    "−" + abs(pendingSeekSeconds) + "s"
+                                } else {
+                                    "+" + pendingSeekSeconds + "s"
+                                }
+                            }
+
+                            "SEEK_FORWARD" -> {
+                                skipArmed = false
+                                pendingSeekSeconds += 30
+                                controlFeedback = if (pendingSeekSeconds < 0) {
+                                    "−" + abs(pendingSeekSeconds) + "s"
+                                } else {
+                                    "+" + pendingSeekSeconds + "s"
+                                }
+                            }
+
+                            "SKIP" -> {
+                                pendingSeekSeconds = 0
+                                controlFeedback = null
+                                if (skipArmed) {
+                                    skipArmed = false
+                                    persistProgress()
+                                    onSkip(video.videoId)
+                                } else {
+                                    skipArmed = true
+                                    skipArmPulse += 1
+                                }
+                            }
+
+                            "TOGGLE" -> {
+                                skipArmed = false
+                                pendingSeekSeconds = 0
+                                controlFeedback = if (playbackState == "PLAYING") "Pause" else "Play"
+                            }
+
+                            "PLAY" -> {
+                                skipArmed = false
+                                pendingSeekSeconds = 0
+                                controlFeedback = "Play"
+                            }
+
+                            "PAUSE" -> {
+                                skipArmed = false
+                                pendingSeekSeconds = 0
+                                controlFeedback = "Pause"
+                            }
+
+                            "SHOW" -> {
+                                skipArmed = false
+                                pendingSeekSeconds = 0
+                                controlFeedback = null
                             }
                         }
-
-                        "TOGGLE" -> {
-                            skipArmed = false
-                            pendingSeekSeconds = 0
-                            controlFeedback = if (playbackState == "PLAYING") "Pause" else "Play"
-                        }
-
-                        "PLAY" -> {
-                            skipArmed = false
-                            pendingSeekSeconds = 0
-                            controlFeedback = "Play"
-                        }
-
-                        "PAUSE" -> {
-                            skipArmed = false
-                            pendingSeekSeconds = 0
-                            controlFeedback = "Pause"
-                        }
-
-                        "SHOW" -> {
-                            skipArmed = false
-                            pendingSeekSeconds = 0
-                            controlFeedback = null
-                        }
-
-                        "HIDE" -> Unit
                     }
                 },
                 onEnded = { videoId ->
@@ -641,29 +670,29 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(72.dp)
+                    .height(46.dp)
                     .background(Color.Black),
             )
 
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(18.dp, 14.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
                     painter = painterResource(R.drawable.deepen_icon),
                     contentDescription = "Deepen",
                     modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(9.dp)),
+                        .size(26.dp)
+                        .clip(RoundedCornerShape(7.dp)),
                     contentScale = ContentScale.Crop,
                 )
-                Spacer(modifier = Modifier.width(9.dp))
+                Spacer(modifier = Modifier.width(7.dp))
                 Text(
                     text = "DEEPEN",
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -741,49 +770,37 @@ private fun PlayerScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Color.Black)
-                    .padding(horizontal = 36.dp, vertical = 18.dp),
+                    .padding(horizontal = 20.dp, vertical = 9.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(0.82f),
-                    ) {
-                        Text(
-                            text = video.title,
-                            color = Color.White,
-                            fontSize = 21.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    Text(
+                        text = video.title,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(0.68f),
+                    )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = publishedLabel(video.publishedAt),
-                            color = DeepenMuted,
-                            fontSize = 13.sp,
-                        )
-                    }
-
-                    if (playbackState != "PLAYING") {
-                        Text(
-                            text = playbackState,
-                            color = if (playbackState == "ERROR") DeepenError else Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    Text(
+                        text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(13.dp))
+                Spacer(modifier = Modifier.height(7.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(5.dp))
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(3.dp))
                         .background(DeepenTrack),
                 ) {
                     Box(
@@ -794,26 +811,17 @@ private fun PlayerScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                    )
-
-                    Text(
-                        text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Hide  ·  ↓ Skip  ·  Back",
-                        color = DeepenMuted,
-                        fontSize = 13.sp,
-                    )
-                }
+                Text(
+                    text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Hide / ↑↑ Previous  ·  ↓ Skip  ·  Back",
+                    color = DeepenMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+        }
         }
     }
 }
@@ -849,7 +857,8 @@ private fun YouTubePlayer(
                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                 AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "SEEK_FORWARD"
 
-                AndroidKeyEvent.KEYCODE_DPAD_UP -> "HIDE"
+                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                AndroidKeyEvent.KEYCODE_MEDIA_PREVIOUS -> "UP"
 
                 AndroidKeyEvent.KEYCODE_DPAD_DOWN,
                 AndroidKeyEvent.KEYCODE_MEDIA_NEXT -> "SKIP"
