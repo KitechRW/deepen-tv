@@ -404,7 +404,7 @@ private fun PlayerScreen(
 
     LaunchedEffect(playbackState, controlPulse) {
         if (playbackState == "PLAYING") {
-            delay(3000)
+            delay(4000)
             overlayVisible = false
         } else {
             overlayVisible = true
@@ -488,6 +488,7 @@ private fun PlayerScreen(
                         "SEEK_BACK" -> "−10s"
                         "SEEK_FORWARD" -> "+30s"
                         "TOGGLE" -> if (playbackState == "PLAYING") "Pause" else "Play"
+                        "SHOW" -> null
                         else -> null
                     }
                 },
@@ -678,6 +679,8 @@ private fun YouTubePlayer(
                         AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
                         AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "SEEK_BACK"
                         AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "SEEK_FORWARD"
+                        AndroidKeyEvent.KEYCODE_DPAD_UP,
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> "SHOW"
                         else -> null
                     }
 
@@ -693,6 +696,7 @@ private fun YouTubePlayer(
                             "TOGGLE" -> "togglePlayback();"
                             "SEEK_BACK" -> "seekBy(-10);"
                             "SEEK_FORWARD" -> "seekBy(30);"
+                            "SHOW" -> ""
                             else -> ""
                         }
 
@@ -829,7 +833,6 @@ private fun youtubePlayerHtml(
                             controls: 0,
                             rel: 0,
                             playsinline: 1,
-                            cc_load_policy: 0,
                             iv_load_policy: 3,
                             disablekb: 1,
                             enablejsapi: 1,
@@ -845,8 +848,18 @@ private fun youtubePlayerHtml(
                     });
                 }
 
+                function disableCaptions() {
+                    if (!player) return;
+                    try { player.unloadModule('captions'); } catch (e) {}
+                    try { player.unloadModule('cc'); } catch (e) {}
+                    try { player.setOption('captions', 'track', {}); } catch (e) {}
+                }
+
                 function onPlayerReady(event) {
                     AndroidBridge.onPlaybackState('READY');
+                    disableCaptions();
+                    setTimeout(disableCaptions, 300);
+                    setTimeout(disableCaptions, 1200);
 
                     if ($startSeconds > 0) {
                         event.target.seekTo($startSeconds, true);
@@ -862,6 +875,7 @@ private fun youtubePlayerHtml(
                         var state = player.getPlayerState();
 
                         if (state === YT.PlayerState.PLAYING) {
+                            disableCaptions();
                             AndroidBridge.onPlaybackState('PLAYING');
                         } else if (state === YT.PlayerState.PAUSED) {
                             AndroidBridge.onPlaybackState('PAUSED');
@@ -874,6 +888,8 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerStateChange(event) {
+                    disableCaptions();
+
                     if (event.data === YT.PlayerState.PLAYING) {
                         var playerElement = document.getElementById('player');
                         if (playerElement) playerElement.style.opacity = '1';
