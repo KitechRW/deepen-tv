@@ -262,7 +262,7 @@ private fun HomeScreen(
             .background(DeepenBackground),
     ) {
         Image(
-            painter = painterResource(R.drawable.deepen_home_hero),
+            painter = painterResource(R.drawable.deepen_home_background_exact),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
