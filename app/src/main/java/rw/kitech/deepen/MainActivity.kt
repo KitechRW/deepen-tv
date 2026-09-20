@@ -259,22 +259,39 @@ private fun HomeScreen(
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            alpha = 0.32f,
         )
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .align(Alignment.CenterStart)
+                .fillMaxHeight()
+                .fillMaxWidth(0.68f)
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            DeepenBackground.copy(alpha = 0.96f),
-                            DeepenBackground.copy(alpha = 0.76f),
-                            DeepenBackground.copy(alpha = 0.90f),
+                            Color.Black.copy(alpha = 0.82f),
+                            DeepenBackground.copy(alpha = 0.58f),
+                            Color.Transparent,
                         )
                     )
-                )
+                ),
         )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 48.dp, end = 64.dp),
+        ) {
+            Button(
+                onClick = onSync,
+                enabled = !syncing,
+            ) {
+                Text(
+                    text = if (syncing) "↻  SYNCING…" else "↻  SYNC",
+                    fontSize = 13.sp,
+                )
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -283,7 +300,7 @@ private fun HomeScreen(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(0.82f),
+                modifier = Modifier.fillMaxWidth(0.68f),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -314,114 +331,67 @@ private fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(52.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 28.dp, height = 20.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFF0033)),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                when {
+                    currentVideo != null -> {
                         Text(
-                            text = "▶",
+                            text = currentVideo.title,
                             color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column {
-                        Text(
-                            text = "Dr. Paul Gitwaza",
-                            color = Color.White,
-                            fontSize = 15.sp,
+                            fontSize = 31.sp,
                             fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "@drpaulmgitwaza",
-                            color = DeepenMuted,
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(34.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 18.dp),
-                ) {
-                    Column {
-                        Text(
-                            text = if (currentVideo == null && stats.total > 0) {
-                                "CAUGHT UP"
-                            } else {
-                                "NEXT MESSAGE"
-                            },
-                            color = DeepenBlue,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                        when {
-                            currentVideo != null -> {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "▦",
+                                color = DeepenMuted,
+                                fontSize = 17.sp,
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Text(
+                                text = publishedLabel(currentVideo.publishedAt),
+                                color = Color.White,
+                                fontSize = 14.sp,
+                            )
+
+                            Spacer(modifier = Modifier.width(28.dp))
+
+                            Text(
+                                text = "▻",
+                                color = DeepenMuted,
+                                fontSize = 18.sp,
+                            )
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Column {
                                 Text(
-                                    text = currentVideo.title,
+                                    text = "Dr. Paul Gitwaza",
                                     color = Color.White,
-                                    fontSize = 30.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
                                 Text(
-                                    text = publishedLabel(currentVideo.publishedAt),
+                                    text = "@drpaulmgitwaza",
                                     color = DeepenMuted,
-                                    fontSize = 17.sp,
-                                )
-
-                                if (currentVideo.progressSeconds > 1.0) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Resume from ${formatPlaybackTime(currentVideo.progressSeconds)}",
-                                        color = DeepenMuted,
-                                        fontSize = 17.sp,
-                                    )
-                                }
-                            }
-
-                            stats.total > 0 -> {
-                                Text(
-                                    text = "You have reached the latest synchronized message.",
-                                    color = Color.White,
-                                    fontSize = 27.sp,
+                                    fontSize = 11.sp,
                                 )
                             }
+                        }
 
-                            syncing -> {
-                                Text(
-                                    text = "Loading the teaching archive…",
-                                    color = Color.White,
-                                    fontSize = 27.sp,
-                                )
-                            }
-
-                            else -> {
-                                Text(
-                                    text = "Deepen is ready to load the teaching archive.",
-                                    color = Color.White,
-                                    fontSize = 27.sp,
-                                )
-                            }
+                        if (currentVideo.progressSeconds > 1.0) {
+                            Spacer(modifier = Modifier.height(18.dp))
+                            Text(
+                                text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
+                                color = DeepenBlue,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
 
                         errorMessage?.let { message ->
@@ -433,31 +403,71 @@ private fun HomeScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(28.dp))
+                        Spacer(modifier = Modifier.height(26.dp))
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (currentVideo != null) {
-                                Button(onClick = onContinue) {
-                                    Text(text = "▶  PLAY")
-                                }
-                            }
-
-                            Button(
-                                onClick = onSync,
-                                enabled = !syncing,
-                            ) {
-                                Text(text = if (syncing) "↻  SYNCING…" else "↻  SYNC")
-                            }
+                        Button(onClick = onContinue) {
+                            Text(
+                                text = "▶  PLAY",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
+                    }
+
+                    stats.total > 0 -> {
+                        Text(
+                            text = "You’re caught up.",
+                            color = Color.White,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Sync to check for new teachings.",
+                            color = DeepenMuted,
+                            fontSize = 17.sp,
+                        )
+                    }
+
+                    syncing -> {
+                        Text(
+                            text = "Preparing your journey…",
+                            color = Color.White,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    else -> {
+                        Text(
+                            text = "Start from the beginning.",
+                            color = Color.White,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Sync the teaching archive to begin.",
+                            color = DeepenMuted,
+                            fontSize = 17.sp,
+                        )
+                    }
+                }
+
+                if (currentVideo == null) {
+                    errorMessage?.let { message ->
+                        Spacer(modifier = Modifier.height(18.dp))
+                        Text(
+                            text = message,
+                            color = DeepenError,
+                            fontSize = 16.sp,
+                        )
                     }
                 }
             }
 
             Column(
-                modifier = Modifier.fillMaxWidth(0.82f),
+                modifier = Modifier.fillMaxWidth(0.68f),
             ) {
                 Text(
                     text = "${stats.watched} of ${stats.total} watched",
@@ -716,31 +726,33 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(46.dp)
+                    .height(60.dp)
                     .background(Color.Black),
             )
 
             Row(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
                     painter = painterResource(R.drawable.deepen_icon),
                     contentDescription = "Deepen",
                     modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(7.dp)),
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Text(
                     text = "DEEPEN - From the beginning",
                     color = Color.White,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -829,7 +841,7 @@ private fun PlayerScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Color.Black)
-                    .padding(horizontal = 20.dp, vertical = 9.dp),
+                    .padding(horizontal = 24.dp, vertical = 15.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -839,27 +851,27 @@ private fun PlayerScreen(
                     Text(
                         text = video.title,
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(0.68f),
+                        modifier = Modifier.fillMaxWidth(0.70f),
                     )
 
                     Text(
                         text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
                         color = Color.White,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(7.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .background(DeepenTrack),
                 ) {
                     Box(
@@ -870,12 +882,12 @@ private fun PlayerScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(9.dp))
 
                 Text(
                     text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Hide / ↑↑ Previous  ·  ↓ Skip  ·  Back",
                     color = DeepenMuted,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
