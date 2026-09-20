@@ -143,7 +143,7 @@ object YouTubeArchive {
                 connection.errorStream
             }
 
-            val body = stream?.bufferedReader()?.use(BufferedReader::readText).orEmpty()
+            val body = stream?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
 
             if (responseCode !in 200..299) {
                 val apiMessage = runCatching {
