@@ -65,6 +65,9 @@ import rw.kitech.deepen.data.YouTubeArchive
 import rw.kitech.deepen.model.VideoItem
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 class MainActivity : ComponentActivity() {
     private var tvPlayerKeyHandler: ((AndroidKeyEvent) -> Boolean)? = null
@@ -339,6 +342,7 @@ private fun HomeScreen(
                             text = currentVideo.title,
                             color = Color.White,
                             fontSize = 31.sp,
+                            lineHeight = 40.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -349,26 +353,35 @@ private fun HomeScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = "▦",
-                                color = DeepenMuted,
-                                fontSize = 17.sp,
+                            Image(
+                                painter = painterResource(R.drawable.ic_calendar_white),
+                                contentDescription = "Published date",
+                                modifier = Modifier.size(22.dp),
                             )
-                            Spacer(modifier = Modifier.width(7.dp))
-                            Text(
-                                text = publishedLabel(currentVideo.publishedAt),
-                                color = Color.White,
-                                fontSize = 14.sp,
-                            )
+                            Spacer(modifier = Modifier.width(9.dp))
+                            Column {
+                                Text(
+                                    text = publishedDayLabel(currentVideo.publishedAt),
+                                    color = DeepenMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = publishedDateLabel(currentVideo.publishedAt),
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
 
-                            Spacer(modifier = Modifier.width(28.dp))
+                            Spacer(modifier = Modifier.width(32.dp))
 
-                            Text(
-                                text = "▻",
-                                color = DeepenMuted,
-                                fontSize = 18.sp,
+                            Image(
+                                painter = painterResource(R.drawable.ic_youtube_white),
+                                contentDescription = "YouTube channel",
+                                modifier = Modifier.size(24.dp),
                             )
-                            Spacer(modifier = Modifier.width(7.dp))
+                            Spacer(modifier = Modifier.width(9.dp))
                             Column {
                                 Text(
                                     text = "Dr. Paul Gitwaza",
@@ -384,16 +397,6 @@ private fun HomeScreen(
                             }
                         }
 
-                        if (currentVideo.progressSeconds > 1.0) {
-                            Spacer(modifier = Modifier.height(18.dp))
-                            Text(
-                                text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
-                                color = DeepenBlue,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-
                         errorMessage?.let { message ->
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
@@ -405,12 +408,26 @@ private fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(26.dp))
 
-                        Button(onClick = onContinue) {
-                            Text(
-                                text = "▶  PLAY",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Button(onClick = onContinue) {
+                                Text(
+                                    text = "▶  PLAY",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+
+                            if (currentVideo.progressSeconds > 1.0) {
+                                Spacer(modifier = Modifier.width(18.dp))
+                                Text(
+                                    text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
+                                    color = DeepenMuted,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
                         }
                     }
 
@@ -1303,8 +1320,25 @@ private fun formatPlaybackTime(seconds: Double): String {
     }
 }
 
-private fun publishedLabel(value: String): String {
-    return value.take(10)
+private fun parsePublishedDate(value: String) =
+    runCatching {
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }.parse(value.take(10))
+    }.getOrNull()
+
+private fun publishedDayLabel(value: String): String {
+    val date = parsePublishedDate(value) ?: return ""
+    return SimpleDateFormat("EEEE", Locale.US)
+        .format(date)
+        .uppercase(Locale.US)
+}
+
+private fun publishedDateLabel(value: String): String {
+    val date = parsePublishedDate(value) ?: return value.take(10)
+    return SimpleDateFormat("MMMM d, yyyy", Locale.US)
+        .format(date)
+        .uppercase(Locale.US)
 }
 
 private val DeepenBlue = Color(0xFF3399FF)
