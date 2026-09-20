@@ -109,6 +109,30 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    fun previousVideo(videoId: String): VideoItem? {
+        val publishedAt = readableDatabase.rawQuery(
+            "SELECT published_at FROM videos WHERE video_id = ? LIMIT 1",
+            arrayOf(videoId),
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return null
+            cursor.getString(0)
+        }
+
+        readableDatabase.rawQuery(
+            """
+            SELECT video_id, title, published_at, completed, progress_seconds, duration_seconds
+            FROM videos
+            WHERE published_at < ?
+               OR (published_at = ? AND video_id < ?)
+            ORDER BY published_at DESC, video_id DESC
+            LIMIT 1
+            """.trimIndent(),
+            arrayOf(publishedAt, publishedAt, videoId),
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toVideoItem() else null
+        }
+    }
+
     fun stats(): JourneyStats {
         readableDatabase.rawQuery(
             """
