@@ -285,26 +285,49 @@ private fun HomeScreen(
             Column(
                 modifier = Modifier.fillMaxWidth(0.82f),
             ) {
-                Text(
-                    text = "DEEPEN",
-                    color = Color.White,
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.deepen_icon),
+                        contentDescription = "Deepen",
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "DEEPEN",
+                            color = Color.White,
+                            fontSize = 38.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "From the beginning",
+                            color = DeepenMuted,
+                            fontSize = 17.sp,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Text(
                     text = "Dr. Paul Gitwaza · oldest → newest",
                     color = DeepenMuted,
-                    fontSize = 18.sp,
+                    fontSize = 14.sp,
                 )
 
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(DeepenPanel)
-                        .padding(32.dp),
+                        .padding(vertical = 18.dp),
                 ) {
                     Column {
                         Text(
@@ -389,13 +412,7 @@ private fun HomeScreen(
                         ) {
                             if (currentVideo != null) {
                                 Button(onClick = onContinue) {
-                                    Text(
-                                        text = if (currentVideo.progressSeconds > 1.0) {
-                                            "CONTINUE"
-                                        } else {
-                                            "PLAY"
-                                        }
-                                    )
+                                    Text(text = "▶  PLAY")
                                 }
                             }
 
@@ -403,7 +420,7 @@ private fun HomeScreen(
                                 onClick = onSync,
                                 enabled = !syncing,
                             ) {
-                                Text(text = if (syncing) "SYNCING…" else "SYNC")
+                                Text(text = if (syncing) "↻  SYNCING…" else "↻  SYNC")
                             }
                         }
                     }
@@ -670,40 +687,33 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(46.dp)
                     .background(Color.Black),
             )
 
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
                     painter = painterResource(R.drawable.deepen_icon),
                     contentDescription = "Deepen",
                     modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(7.dp)),
                     contentScale = ContentScale.Crop,
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                Column {
-                    Text(
-                        text = "DEEPEN",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "From the beginning",
-                        color = DeepenMuted,
-                        fontSize = 10.sp,
-                    )
-                }
+                Text(
+                    text = "DEEPEN - From the beginning",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         } else {
             Image(
