@@ -60,6 +60,20 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
+    private var tvPlayerKeyHandler: ((AndroidKeyEvent) -> Boolean)? = null
+
+    fun setTvPlayerKeyHandler(handler: ((AndroidKeyEvent) -> Boolean)?) {
+        tvPlayerKeyHandler = handler
+    }
+
+    override fun dispatchKeyEvent(event: AndroidKeyEvent): Boolean {
+        if (tvPlayerKeyHandler?.invoke(event) == true) {
+            return true
+        }
+
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -404,7 +418,7 @@ private fun PlayerScreen(
 
     LaunchedEffect(playbackState, controlPulse) {
         if (playbackState == "PLAYING") {
-            delay(3000)
+            delay(4000)
             overlayVisible = false
         } else {
             overlayVisible = true
@@ -488,6 +502,9 @@ private fun PlayerScreen(
                         "SEEK_BACK" -> "−10s"
                         "SEEK_FORWARD" -> "+30s"
                         "TOGGLE" -> if (playbackState == "PLAYING") "Pause" else "Play"
+                        "PLAY" -> "Play"
+                        "PAUSE" -> "Pause"
+                        "SHOW" -> null
                         else -> null
                     }
                 },
@@ -641,6 +658,64 @@ private fun YouTubePlayer(
     onEnded: (String) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
+    val activity = LocalContext.current as? MainActivity
+
+    DisposableEffect(activity, webView, video.videoId) {
+        val handler: (AndroidKeyEvent) -> Boolean = { event ->
+            val action = when (event.keyCode) {
+                AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                AndroidKeyEvent.KEYCODE_ENTER,
+                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                AndroidKeyEvent.KEYCODE_BUTTON_A,
+                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
+
+                AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> "PLAY"
+                AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> "PAUSE"
+
+                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> "SEEK_BACK"
+
+                AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "SEEK_FORWARD"
+
+                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                AndroidKeyEvent.KEYCODE_DPAD_DOWN -> "SHOW"
+
+                else -> null
+            }
+
+            if (action == null) {
+                false
+            } else {
+                if (
+                    event.action == AndroidKeyEvent.ACTION_DOWN &&
+                    event.repeatCount == 0
+                ) {
+                    val script = when (action) {
+                        "TOGGLE" -> "togglePlayback();"
+                        "PLAY" -> "playVideo();"
+                        "PAUSE" -> "pauseVideo();"
+                        "SEEK_BACK" -> "seekBy(-10);"
+                        "SEEK_FORWARD" -> "seekBy(30);"
+                        else -> ""
+                    }
+
+                    onControl(action)
+                    if (script.isNotEmpty()) {
+                        webView?.evaluateJavascript(script, null)
+                    }
+                }
+
+                true
+            }
+        }
+
+        activity?.setTvPlayerKeyHandler(handler)
+
+        onDispose {
+            activity?.setTvPlayerKeyHandler(null)
+        }
+    }
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -670,38 +745,6 @@ private fun YouTubePlayer(
 
                 isFocusable = true
                 isFocusableInTouchMode = true
-
-                setOnKeyListener { _, keyCode, event ->
-                    val action = when (keyCode) {
-                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                        AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
-                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "SEEK_BACK"
-                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "SEEK_FORWARD"
-                        else -> null
-                    }
-
-                    if (action == null) {
-                        return@setOnKeyListener false
-                    }
-
-                    if (
-                        event.action == AndroidKeyEvent.ACTION_DOWN &&
-                        event.repeatCount == 0
-                    ) {
-                        val script = when (action) {
-                            "TOGGLE" -> "togglePlayback();"
-                            "SEEK_BACK" -> "seekBy(-10);"
-                            "SEEK_FORWARD" -> "seekBy(30);"
-                            else -> ""
-                        }
-
-                        onControl(action)
-                        evaluateJavascript(script, null)
-                    }
-
-                    true
-                }
 
                 loadDataWithBaseURL(
                     "https://rw.kitech.deepen/",
@@ -829,7 +872,6 @@ private fun youtubePlayerHtml(
                             controls: 0,
                             rel: 0,
                             playsinline: 1,
-                            cc_load_policy: 0,
                             iv_load_policy: 3,
                             disablekb: 1,
                             enablejsapi: 1,
@@ -845,8 +887,18 @@ private fun youtubePlayerHtml(
                     });
                 }
 
+                function disableCaptions() {
+                    if (!player) return;
+                    try { player.unloadModule('captions'); } catch (e) {}
+                    try { player.unloadModule('cc'); } catch (e) {}
+                    try { player.setOption('captions', 'track', {}); } catch (e) {}
+                }
+
                 function onPlayerReady(event) {
                     AndroidBridge.onPlaybackState('READY');
+                    disableCaptions();
+                    setTimeout(disableCaptions, 300);
+                    setTimeout(disableCaptions, 1200);
 
                     if ($startSeconds > 0) {
                         event.target.seekTo($startSeconds, true);
@@ -862,6 +914,7 @@ private fun youtubePlayerHtml(
                         var state = player.getPlayerState();
 
                         if (state === YT.PlayerState.PLAYING) {
+                            disableCaptions();
                             AndroidBridge.onPlaybackState('PLAYING');
                         } else if (state === YT.PlayerState.PAUSED) {
                             AndroidBridge.onPlaybackState('PAUSED');
@@ -874,6 +927,8 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerStateChange(event) {
+                    disableCaptions();
+
                     if (event.data === YT.PlayerState.PLAYING) {
                         var playerElement = document.getElementById('player');
                         if (playerElement) playerElement.style.opacity = '1';
@@ -912,14 +967,24 @@ private fun youtubePlayerHtml(
                     AndroidBridge.onPlaybackState('READY');
                 }
 
+                function playVideo() {
+                    if (!player || typeof player.playVideo !== 'function') return;
+                    player.playVideo();
+                }
+
+                function pauseVideo() {
+                    if (!player || typeof player.pauseVideo !== 'function') return;
+                    player.pauseVideo();
+                }
+
                 function togglePlayback() {
                     if (!player || typeof player.getPlayerState !== 'function') return;
 
                     var state = player.getPlayerState();
                     if (state === YT.PlayerState.PLAYING) {
-                        player.pauseVideo();
+                        pauseVideo();
                     } else {
-                        player.playVideo();
+                        playVideo();
                     }
                 }
 
