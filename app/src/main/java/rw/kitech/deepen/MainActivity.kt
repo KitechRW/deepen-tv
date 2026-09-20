@@ -385,6 +385,9 @@ private fun PlayerScreen(
     var playbackState by remember(video.videoId) {
         mutableStateOf("LOADING")
     }
+    var playbackError by remember(video.videoId) {
+        mutableStateOf<String?>(null)
+    }
     var lastPersistedPosition by remember(video.videoId) {
         mutableStateOf(video.progressSeconds)
     }
@@ -433,16 +436,55 @@ private fun PlayerScreen(
                 },
                 onPlaybackState = { state ->
                     playbackState = state
+                    if (state == "PLAYING") {
+                        playbackError = null
+                    }
 
                     if (state == "PAUSED") {
                         persistProgress()
                     }
+                },
+                onPlaybackError = { code ->
+                    playbackState = "ERROR"
+                    playbackError = playerErrorMessage(code)
                 },
                 onEnded = { videoId ->
                     persistProgress()
                     onEnded(videoId)
                 },
             )
+        }
+
+        playbackError?.let { message ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.72f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.Black.copy(alpha = 0.88f))
+                    .padding(28.dp),
+            ) {
+                Column {
+                    Text(
+                        text = "Playback problem",
+                        color = DeepenError,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = message,
+                        color = Color.White,
+                        fontSize = 17.sp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Press Back to return to your journey.",
+                        color = DeepenMuted,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
         }
 
         Column(
@@ -538,6 +580,7 @@ private fun YouTubePlayer(
     video: VideoItem,
     onProgress: (String, Double, Double) -> Unit,
     onPlaybackState: (String) -> Unit,
+    onPlaybackError: (String) -> Unit,
     onEnded: (String) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -562,6 +605,7 @@ private fun YouTubePlayer(
                         videoId = video.videoId,
                         onProgress = onProgress,
                         onPlaybackState = onPlaybackState,
+                        onPlaybackError = onPlaybackError,
                         onEnded = onEnded,
                     ),
                     "AndroidBridge",
@@ -594,7 +638,7 @@ private fun YouTubePlayer(
                 }
 
                 loadDataWithBaseURL(
-                    "https://www.youtube.com",
+                    "https://rw.kitech.deepen/",
                     youtubePlayerHtml(
                         videoId = video.videoId,
                         startSeconds = (video.progressSeconds - 2.0)
@@ -628,6 +672,7 @@ private class PlayerBridge(
     private val videoId: String,
     private val onProgress: (String, Double, Double) -> Unit,
     private val onPlaybackState: (String) -> Unit,
+    private val onPlaybackError: (String) -> Unit,
     private val onEnded: (String) -> Unit,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -650,6 +695,13 @@ private class PlayerBridge(
     }
 
     @JavascriptInterface
+    fun onPlayerError(code: String) {
+        mainHandler.post {
+            onPlaybackError(code)
+        }
+    }
+
+    @JavascriptInterface
     fun onEnded() {
         mainHandler.post {
             onEnded(videoId)
@@ -667,7 +719,7 @@ private fun youtubePlayerHtml(
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                html, body, #player {
+                html, body {
                     width: 100%;
                     height: 100%;
                     margin: 0;
@@ -675,9 +727,26 @@ private fun youtubePlayerHtml(
                     overflow: hidden;
                     background: #000;
                 }
+                #poster {
+                    position: fixed;
+                    inset: 0;
+                    background:
+                        linear-gradient(rgba(0,0,0,.18), rgba(0,0,0,.55)),
+                        url('https://i.ytimg.com/vi/$videoId/hqdefault.jpg') center center / cover no-repeat;
+                }
+                #player {
+                    position: fixed;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                    opacity: 0;
+                    transition: opacity 180ms ease;
+                    background: #000;
+                }
             </style>
         </head>
         <body>
+            <div id="poster"></div>
             <div id="player"></div>
             <script src="https://www.youtube.com/iframe_api"></script>
             <script>
@@ -693,11 +762,16 @@ private fun youtubePlayerHtml(
                             autoplay: 1,
                             controls: 0,
                             rel: 0,
-                            playsinline: 1
+                            playsinline: 1,
+                            enablejsapi: 1,
+                            origin: 'https://rw.kitech.deepen',
+                            widget_referrer: 'https://rw.kitech.deepen'
                         },
                         events: {
                             onReady: onPlayerReady,
-                            onStateChange: onPlayerStateChange
+                            onStateChange: onPlayerStateChange,
+                            onError: onPlayerError,
+                            onAutoplayBlocked: onAutoplayBlocked
                         }
                     });
                 }
@@ -723,6 +797,10 @@ private fun youtubePlayerHtml(
 
                 function onPlayerStateChange(event) {
                     if (event.data === YT.PlayerState.PLAYING) {
+                        var playerElement = document.getElementById('player');
+                        if (playerElement) playerElement.style.opacity = '1';
+                        var poster = document.getElementById('poster');
+                        if (poster) poster.style.display = 'none';
                         AndroidBridge.onPlaybackState('PLAYING');
                     } else if (event.data === YT.PlayerState.PAUSED) {
                         AndroidBridge.onPlaybackState('PAUSED');
@@ -743,6 +821,17 @@ private fun youtubePlayerHtml(
                         AndroidBridge.onProgress(current, duration);
                         AndroidBridge.onEnded();
                     }
+                }
+
+                function onPlayerError(event) {
+                    var code = String(event && event.data != null ? event.data : 'UNKNOWN');
+                    var playerElement = document.getElementById('player');
+                    if (playerElement) playerElement.style.opacity = '0';
+                    AndroidBridge.onPlayerError(code);
+                }
+
+                function onAutoplayBlocked() {
+                    AndroidBridge.onPlaybackState('READY');
                 }
 
                 function togglePlayback() {
@@ -773,6 +862,17 @@ private fun youtubePlayerHtml(
         </body>
         </html>
     """.trimIndent()
+}
+
+private fun playerErrorMessage(code: String): String {
+    return when (code) {
+        "2" -> "YouTube rejected this video ID."
+        "5" -> "YouTube could not start HTML5 playback on this TV."
+        "100" -> "This video is unavailable or has been removed."
+        "101", "150" -> "The owner of this video does not allow embedded playback."
+        "153" -> "YouTube could not identify Deepen as the embedding app. Please install the latest Deepen build."
+        else -> "YouTube player error $code. Please return and try again."
+    }
 }
 
 private fun formatPlaybackTime(seconds: Double): String {
