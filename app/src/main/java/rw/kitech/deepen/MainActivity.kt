@@ -40,9 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.nativeKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -424,30 +421,7 @@ private fun YouTubePlayer(
     var webView by remember { mutableStateOf<WebView?>(null) }
 
     AndroidView(
-        modifier = Modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) {
-                    return@onPreviewKeyEvent false
-                }
-
-                val script = when (event.nativeKeyEvent.keyCode) {
-                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
-                    AndroidKeyEvent.KEYCODE_ENTER,
-                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "togglePlayback();"
-
-                    AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "seekBy(-10);"
-                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "seekBy(30);"
-                    else -> null
-                }
-
-                if (script != null) {
-                    webView?.evaluateJavascript(script, null)
-                    true
-                } else {
-                    false
-                }
-            },
+        modifier = Modifier.fillMaxSize(),
         factory = { context ->
             WebView(context).apply {
                 settings.javaScriptEnabled = true
@@ -472,6 +446,29 @@ private fun YouTubePlayer(
 
                 isFocusable = true
                 isFocusableInTouchMode = true
+
+                setOnKeyListener { _, keyCode, event ->
+                    if (event.action != AndroidKeyEvent.ACTION_DOWN) {
+                        return@setOnKeyListener false
+                    }
+
+                    val script = when (keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "togglePlayback();"
+
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "seekBy(-10);"
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "seekBy(30);"
+                        else -> null
+                    }
+
+                    if (script != null) {
+                        evaluateJavascript(script, null)
+                        true
+                    } else {
+                        false
+                    }
+                }
 
                 loadDataWithBaseURL(
                     "https://www.youtube.com",
