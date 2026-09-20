@@ -1,10 +1,10 @@
 name: Android
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-      - feat/mvp-android-tv
   pull_request:
     branches:
       - main
@@ -29,13 +29,54 @@ jobs:
           gradle-version: "9.6.0"
 
       - name: Build debug APK
+        if: github.event_name == 'pull_request'
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: gradle :app:assembleDebug -PYOUTUBE_API_KEY="$YOUTUBE_API_KEY"
 
+      - name: Verify release signing secrets
+        if: github.event_name != 'pull_request'
+        env:
+          DEEPEN_KEYSTORE_B64: ${{ secrets.DEEPEN_KEYSTORE_B64 }}
+          DEEPEN_KEYSTORE_PASSWORD: ${{ secrets.DEEPEN_KEYSTORE_PASSWORD }}
+          DEEPEN_KEY_ALIAS: ${{ secrets.DEEPEN_KEY_ALIAS }}
+          DEEPEN_KEY_PASSWORD: ${{ secrets.DEEPEN_KEY_PASSWORD }}
+        run: |
+          test -n "$DEEPEN_KEYSTORE_B64"
+          test -n "$DEEPEN_KEYSTORE_PASSWORD"
+          test -n "$DEEPEN_KEY_ALIAS"
+          test -n "$DEEPEN_KEY_PASSWORD"
+
+      - name: Restore release keystore
+        if: github.event_name != 'pull_request'
+        env:
+          DEEPEN_KEYSTORE_B64: ${{ secrets.DEEPEN_KEYSTORE_B64 }}
+        run: |
+          printf '%s' "$DEEPEN_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/deepen-release.jks"
+
+      - name: Build signed release APK
+        if: github.event_name != 'pull_request'
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          DEEPEN_KEYSTORE_PASSWORD: ${{ secrets.DEEPEN_KEYSTORE_PASSWORD }}
+          DEEPEN_KEY_ALIAS: ${{ secrets.DEEPEN_KEY_ALIAS }}
+          DEEPEN_KEY_PASSWORD: ${{ secrets.DEEPEN_KEY_PASSWORD }}
+        run: |
+          gradle :app:assembleRelease             -PYOUTUBE_API_KEY="$YOUTUBE_API_KEY"             -PDEEPEN_KEYSTORE_PATH="$RUNNER_TEMP/deepen-release.jks"             -PDEEPEN_KEYSTORE_PASSWORD="$DEEPEN_KEYSTORE_PASSWORD"             -PDEEPEN_KEY_ALIAS="$DEEPEN_KEY_ALIAS"             -PDEEPEN_KEY_PASSWORD="$DEEPEN_KEY_PASSWORD"             -PVERSION_CODE="$GITHUB_RUN_NUMBER"             -PVERSION_NAME="0.2.$GITHUB_RUN_NUMBER"
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Deepen.apk
+
       - name: Upload debug APK
+        if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: deepen-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload signed release APK
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepen-release-apk
+          path: app/build/outputs/apk/release/Deepen.apk
           if-no-files-found: error
