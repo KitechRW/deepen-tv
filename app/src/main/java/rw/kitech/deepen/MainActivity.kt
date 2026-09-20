@@ -17,8 +17,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Dispatchers
@@ -269,247 +273,392 @@ private fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
-                .fillMaxWidth(0.68f)
+                .fillMaxWidth(0.64f)
                 .background(
                     Brush.horizontalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.82f),
-                            DeepenBackground.copy(alpha = 0.58f),
+                        colors = listOf(
+                            Color(0xFF020711).copy(alpha = 0.96f),
+                            Color(0xFF041126).copy(alpha = 0.82f),
+                            Color(0xFF071B35).copy(alpha = 0.38f),
                             Color.Transparent,
-                        )
+                        ),
                     )
                 ),
         )
 
-        Box(
+        Row(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 48.dp, end = 64.dp),
+                .align(Alignment.TopStart)
+                .padding(start = 64.dp, top = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(
-                onClick = onSync,
-                enabled = !syncing,
-            ) {
+            Image(
+                painter = painterResource(R.drawable.deepen_icon),
+                contentDescription = "Deepen",
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(13.dp)),
+                contentScale = ContentScale.Crop,
+            )
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column {
                 Text(
-                    text = if (syncing) "↻  SYNCING…" else "↻  SYNC",
-                    fontSize = 13.sp,
+                    text = "DEEPEN",
+                    color = Color.White,
+                    fontSize = 31.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "From the beginning",
+                    color = Color(0xFFC7D0DC),
+                    fontSize = 15.sp,
                 )
             }
         }
 
+        DeepenSyncButton(
+            syncing = syncing,
+            onClick = onSync,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 44.dp, end = 60.dp),
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 64.dp, vertical = 48.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .align(Alignment.CenterStart)
+                .fillMaxWidth(0.62f)
+                .padding(start = 64.dp, end = 24.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(0.68f),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.deepen_icon),
-                        contentDescription = "Deepen",
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Crop,
+            when {
+                currentVideo != null -> {
+                    Text(
+                        text = currentVideo.title,
+                        color = Color.White,
+                        fontSize = 31.sp,
+                        lineHeight = 43.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    Column {
-                        Text(
-                            text = "DEEPEN",
-                            color = Color.White,
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "From the beginning",
-                            color = DeepenMuted,
-                            fontSize = 17.sp,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(52.dp))
-
-                when {
-                    currentVideo != null -> {
-                        Text(
-                            text = currentVideo.title,
-                            color = Color.White,
-                            fontSize = 31.sp,
-                            lineHeight = 40.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.ic_calendar_white),
                                 contentDescription = "Published date",
-                                modifier = Modifier.size(22.dp),
+                                modifier = Modifier.size(27.dp),
                             )
-                            Spacer(modifier = Modifier.width(9.dp))
+
+                            Spacer(modifier = Modifier.width(11.dp))
+
                             Column {
                                 Text(
                                     text = publishedDayLabel(currentVideo.publishedAt),
-                                    color = DeepenMuted,
-                                    fontSize = 11.sp,
+                                    color = Color(0xFFBAC5D3),
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
                                     text = publishedDateLabel(currentVideo.publishedAt),
                                     color = Color.White,
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(32.dp))
-
-                            Image(
-                                painter = painterResource(R.drawable.ic_youtube_white),
-                                contentDescription = "YouTube channel",
-                                modifier = Modifier.size(24.dp),
-                            )
-                            Spacer(modifier = Modifier.width(9.dp))
-                            Column {
-                                Text(
-                                    text = "Dr. Paul Gitwaza",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    text = "@drpaulmgitwaza",
-                                    color = DeepenMuted,
-                                    fontSize = 11.sp,
                                 )
                             }
                         }
 
-                        errorMessage?.let { message ->
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = message,
-                                color = DeepenError,
-                                fontSize = 16.sp,
-                            )
-                        }
+                        Spacer(modifier = Modifier.width(25.dp))
 
-                        Spacer(modifier = Modifier.height(26.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(44.dp)
+                                .background(Color.White.copy(alpha = 0.32f)),
+                        )
+
+                        Spacer(modifier = Modifier.width(25.dp))
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Button(onClick = onContinue) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_youtube_white),
+                                contentDescription = "YouTube channel",
+                                modifier = Modifier.size(30.dp),
+                            )
+
+                            Spacer(modifier = Modifier.width(11.dp))
+
+                            Column {
                                 Text(
-                                    text = "▶  PLAY",
+                                    text = "Dr. Paul Gitwaza",
+                                    color = Color.White,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
-                            }
-
-                            if (currentVideo.progressSeconds > 1.0) {
-                                Spacer(modifier = Modifier.width(18.dp))
                                 Text(
-                                    text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
-                                    color = DeepenMuted,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    text = "@drpaulmgitwaza",
+                                    color = Color(0xFFBAC5D3),
+                                    fontSize = 12.sp,
                                 )
                             }
                         }
                     }
 
-                    stats.total > 0 -> {
-                        Text(
-                            text = "You’re caught up.",
-                            color = Color.White,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Sync to check for new teachings.",
-                            color = DeepenMuted,
-                            fontSize = 17.sp,
-                        )
-                    }
-
-                    syncing -> {
-                        Text(
-                            text = "Preparing your journey…",
-                            color = Color.White,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-
-                    else -> {
-                        Text(
-                            text = "Start from the beginning.",
-                            color = Color.White,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Sync the teaching archive to begin.",
-                            color = DeepenMuted,
-                            fontSize = 17.sp,
-                        )
-                    }
-                }
-
-                if (currentVideo == null) {
                     errorMessage?.let { message ->
-                        Spacer(modifier = Modifier.height(18.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = message,
                             color = DeepenError,
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(30.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DeepenPlayButton(
+                            onClick = onContinue,
+                        )
+
+                        if (currentVideo.progressSeconds > 1.0) {
+                            Spacer(modifier = Modifier.width(22.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(42.dp)
+                                    .background(Color.White.copy(alpha = 0.32f)),
+                            )
+
+                            Spacer(modifier = Modifier.width(22.dp))
+
+                            Text(
+                                text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
                 }
-            }
 
-            Column(
-                modifier = Modifier.fillMaxWidth(0.68f),
-            ) {
-                Text(
-                    text = "${stats.watched} of ${stats.total} watched",
-                    color = DeepenMuted,
-                    fontSize = 16.sp,
-                )
+                stats.total > 0 -> {
+                    Text(
+                        text = "You’re caught up.",
+                        color = Color.White,
+                        fontSize = 31.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Sync to check for new teachings.",
+                        color = DeepenMuted,
+                        fontSize = 17.sp,
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                syncing -> {
+                    Text(
+                        text = "Preparing your journey…",
+                        color = Color.White,
+                        fontSize = 31.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DeepenTrack),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(journeyProgress.coerceIn(0f, 1f))
-                            .background(DeepenBlue),
+                else -> {
+                    Text(
+                        text = "Start from the beginning.",
+                        color = Color.White,
+                        fontSize = 31.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Sync the teaching archive to begin.",
+                        color = DeepenMuted,
+                        fontSize = 17.sp,
                     )
                 }
             }
+
+            if (currentVideo == null) {
+                errorMessage?.let { message ->
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Text(
+                        text = message,
+                        color = DeepenError,
+                        fontSize = 16.sp,
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth(0.52f)
+                .padding(start = 64.dp, bottom = 42.dp),
+        ) {
+            Text(
+                text = "${stats.watched} of ${stats.total} watched",
+                color = Color(0xFFC2CCD8),
+                fontSize = 15.sp,
+            )
+
+            Spacer(modifier = Modifier.height(11.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Color(0xFF64758A).copy(alpha = 0.70f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(journeyProgress.coerceIn(0f, 1f))
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(DeepenBlue),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeepenPlayButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val pill = RoundedCornerShape(50)
+
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme.copy(
+            surfaceVariant = Color(0xFF208BFF),
+            onSurface = Color.White,
+            inverseSurface = Color(0xFF48B7FF),
+            inverseOnSurface = Color.White,
+        ),
+    ) {
+        Button(
+            onClick = onClick,
+            modifier = modifier
+                .onFocusChanged { focused = it.isFocused }
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) {
+                        Color(0xFFBDEBFF)
+                    } else {
+                        Color.White.copy(alpha = 0.10f)
+                    },
+                    shape = pill,
+                ),
+            scale = ButtonDefaults.scale(
+                scale = 1.0f,
+                focusedScale = 1.06f,
+                pressedScale = 0.98f,
+            ),
+            shape = ButtonDefaults.shape(
+                shape = pill,
+                focusedShape = pill,
+                pressedShape = pill,
+            ),
+            contentPadding = PaddingValues(
+                horizontal = 28.dp,
+                vertical = 15.dp,
+            ),
+        ) {
+            Text(
+                text = "▶",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.width(11.dp))
+            Text(
+                text = "PLAY",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeepenSyncButton(
+    syncing: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val pill = RoundedCornerShape(50)
+
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme.copy(
+            surfaceVariant = Color(0xFF0B1422),
+            onSurface = Color.White,
+            inverseSurface = Color(0xFF173A63),
+            inverseOnSurface = Color.White,
+        ),
+    ) {
+        Button(
+            onClick = onClick,
+            enabled = !syncing,
+            modifier = modifier
+                .onFocusChanged { focused = it.isFocused }
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) {
+                        Color(0xFF8FD6FF)
+                    } else {
+                        Color.White.copy(alpha = 0.24f)
+                    },
+                    shape = pill,
+                ),
+            scale = ButtonDefaults.scale(
+                scale = 1.0f,
+                focusedScale = 1.06f,
+                pressedScale = 0.98f,
+            ),
+            shape = ButtonDefaults.shape(
+                shape = pill,
+                focusedShape = pill,
+                pressedShape = pill,
+            ),
+            contentPadding = PaddingValues(
+                horizontal = 20.dp,
+                vertical = 11.dp,
+            ),
+        ) {
+            Text(
+                text = "↻",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (syncing) "SYNCING…" else "SYNC",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -521,155 +670,134 @@ private fun DeepenHeroBackground(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val horizon = Offset(w * 0.76f, h * 0.53f)
 
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    Color(0xFF030711),
-                    Color(0xFF071A36),
-                    Color(0xFF0B4FA8),
-                    Color(0xFF082A5A),
+                    Color(0xFF020711),
+                    Color(0xFF061633),
+                    Color(0xFF0A4BA8),
+                    Color(0xFF072B65),
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h),
             ),
         )
 
+        val dLeft = w * 0.60f
+        val dTop = h * 0.14f
+        val dBottom = h * 0.72f
+        val dRight = w * 0.93f
+        val centerY = (dTop + dBottom) / 2f
+
+        fun dPath(insetX: Float, insetY: Float): Path {
+            val left = dLeft + insetX
+            val top = dTop + insetY
+            val bottom = dBottom - insetY
+            val right = dRight - insetX * 0.45f
+
+            return Path().apply {
+                moveTo(left, top)
+                lineTo(left, bottom)
+                cubicTo(
+                    right, bottom,
+                    right, top,
+                    left, top,
+                )
+            }
+        }
+
+        val dLayers = listOf(
+            Triple(0f, 0f, 82f),
+            Triple(w * 0.035f, h * 0.055f, 48f),
+            Triple(w * 0.066f, h * 0.105f, 30f),
+            Triple(w * 0.092f, h * 0.148f, 18f),
+        )
+
+        dLayers.forEachIndexed { index, (ix, iy, stroke) ->
+            drawPath(
+                path = dPath(ix, iy),
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF123B86).copy(alpha = 0.80f),
+                        Color(0xFF30BFFF).copy(alpha = 0.96f),
+                        Color(0xFF8BEAFF).copy(alpha = 0.88f),
+                    ),
+                    startX = dLeft,
+                    endX = dRight,
+                ),
+                style = Stroke(width = stroke),
+            )
+
+            drawPath(
+                path = dPath(ix, iy),
+                color = Color(0xFFB8F3FF).copy(alpha = 0.56f - index * 0.08f),
+                style = Stroke(width = 2.3f),
+            )
+        }
+
+        val lightCenter = Offset(w * 0.715f, centerY)
+
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFFDDF8FF).copy(alpha = 0.95f),
-                    Color(0xFF54C9FF).copy(alpha = 0.58f),
-                    Color(0xFF1A79FF).copy(alpha = 0.18f),
+                    Color.White.copy(alpha = 0.92f),
+                    Color(0xFF7FE8FF).copy(alpha = 0.62f),
+                    Color(0xFF278EFF).copy(alpha = 0.24f),
                     Color.Transparent,
                 ),
-                center = horizon,
-                radius = w * 0.34f,
+                center = lightCenter,
+                radius = w * 0.15f,
             ),
-            radius = w * 0.34f,
-            center = horizon,
+            radius = w * 0.15f,
+            center = lightCenter,
         )
 
-        val archFractions = listOf(0.34f, 0.27f, 0.205f, 0.145f)
-        archFractions.forEachIndexed { index, fraction ->
-            val radiusX = w * fraction
-            val radiusY = radiusX * 0.78f
-            val left = horizon.x - radiusX
-            val top = horizon.y - radiusY
-            val archSize = androidx.compose.ui.geometry.Size(radiusX * 2f, radiusY * 2f)
-            val baseY = h * (0.86f - index * 0.018f)
-
-            drawArc(
-                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(left, top),
-                size = archSize,
-                style = Stroke(width = 18f + index * 2f),
+        val road = Path().apply {
+            moveTo(w * 0.36f, h)
+            cubicTo(
+                w * 0.49f, h * 0.82f,
+                w * 0.66f, h * 0.70f,
+                w * 0.68f, h * 0.60f,
             )
-            drawArc(
-                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(left, top),
-                size = archSize,
-                style = Stroke(width = 3.2f),
-            )
-
-            val leftLegX = horizon.x - radiusX
-            val rightLegX = horizon.x + radiusX
-
-            drawLine(
-                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
-                start = Offset(leftLegX, horizon.y),
-                end = Offset(leftLegX, baseY),
-                strokeWidth = 18f + index * 2f,
-            )
-            drawLine(
-                color = Color(0xFF35B7FF).copy(alpha = 0.12f),
-                start = Offset(rightLegX, horizon.y),
-                end = Offset(rightLegX, baseY),
-                strokeWidth = 18f + index * 2f,
-            )
-            drawLine(
-                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
-                start = Offset(leftLegX, horizon.y),
-                end = Offset(leftLegX, baseY),
-                strokeWidth = 3.2f,
-            )
-            drawLine(
-                color = Color(0xFF8DE7FF).copy(alpha = 0.82f - index * 0.10f),
-                start = Offset(rightLegX, horizon.y),
-                end = Offset(rightLegX, baseY),
-                strokeWidth = 3.2f,
+            cubicTo(
+                w * 0.70f, h * 0.51f,
+                w * 0.68f, h * 0.47f,
+                lightCenter.x, lightCenter.y,
             )
         }
 
-        val path = Path().apply {
-            moveTo(horizon.x - w * 0.012f, horizon.y + h * 0.018f)
-            lineTo(w * 0.46f, h)
-            lineTo(w * 0.98f, h)
-            lineTo(horizon.x + w * 0.012f, horizon.y + h * 0.018f)
-            close()
-        }
         drawPath(
-            path = path,
+            path = road,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFF086BFF).copy(alpha = 0.18f),
+                    Color(0xFF27A7FF).copy(alpha = 0.55f),
+                    Color(0xFF8CEEFF).copy(alpha = 0.96f),
+                ),
+                start = Offset(w * 0.38f, h),
+                end = lightCenter,
+            ),
+            style = Stroke(width = w * 0.085f),
+        )
+
+        drawPath(
+            path = road,
+            color = Color(0xFFC5F7FF).copy(alpha = 0.74f),
+            style = Stroke(width = 2.2f),
+        )
+
+        drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color(0xFFBDF7FF).copy(alpha = 0.54f),
-                    Color(0xFF1686E8).copy(alpha = 0.32f),
-                    Color(0xFF071B34).copy(alpha = 0.72f),
+                    Color.Transparent,
+                    Color(0xFF05152A).copy(alpha = 0.18f),
+                    Color(0xFF020711).copy(alpha = 0.62f),
                 ),
-                startY = horizon.y,
+                startY = h * 0.52f,
                 endY = h,
             ),
         )
-
-        val leftEdge = Offset(w * 0.46f, h)
-        val rightEdge = Offset(w * 0.98f, h)
-        listOf(leftEdge, rightEdge).forEach { edge ->
-            drawLine(
-                color = Color(0xFF43C9FF).copy(alpha = 0.18f),
-                start = horizon,
-                end = edge,
-                strokeWidth = 14f,
-            )
-            drawLine(
-                color = Color(0xFFB9F6FF).copy(alpha = 0.78f),
-                start = horizon,
-                end = edge,
-                strokeWidth = 2.4f,
-            )
-        }
-
-        listOf(0.64f, 0.72f, 0.81f, 0.91f).forEachIndexed { index, yFraction ->
-            val y = h * yFraction
-            drawLine(
-                color = Color(0xFF73D8FF).copy(alpha = 0.12f - index * 0.015f),
-                start = Offset(w * 0.40f, y),
-                end = Offset(w, y),
-                strokeWidth = 1.5f,
-            )
-        }
-
-        val stars = listOf(
-            0.58f to 0.14f,
-            0.67f to 0.20f,
-            0.84f to 0.11f,
-            0.91f to 0.27f,
-            0.73f to 0.09f,
-            0.96f to 0.17f,
-        )
-        stars.forEachIndexed { index, (x, y) ->
-            drawCircle(
-                color = Color.White.copy(alpha = 0.35f + index * 0.05f),
-                radius = 1.4f + (index % 2) * 0.7f,
-                center = Offset(w * x, h * y),
-            )
-        }
     }
 }
 
