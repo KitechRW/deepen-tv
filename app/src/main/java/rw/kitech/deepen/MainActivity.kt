@@ -55,6 +55,7 @@ import rw.kitech.deepen.data.JourneyStats
 import rw.kitech.deepen.data.VideoStore
 import rw.kitech.deepen.data.YouTubeArchive
 import rw.kitech.deepen.model.VideoItem
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -375,7 +376,38 @@ private fun PlayerScreen(
     onEnded: (String) -> Unit,
     onExit: () -> Unit,
 ) {
-    BackHandler(onBack = onExit)
+    var playbackPosition by remember(video.videoId) {
+        mutableStateOf(video.progressSeconds)
+    }
+    var durationSeconds by remember(video.videoId) {
+        mutableStateOf(video.durationSeconds)
+    }
+    var playbackState by remember(video.videoId) {
+        mutableStateOf("LOADING")
+    }
+    var lastPersistedPosition by remember(video.videoId) {
+        mutableStateOf(video.progressSeconds)
+    }
+
+    fun persistProgress() {
+        onProgress(
+            video.videoId,
+            playbackPosition,
+            durationSeconds,
+        )
+        lastPersistedPosition = playbackPosition
+    }
+
+    BackHandler {
+        persistProgress()
+        onExit()
+    }
+
+    val progress = if (durationSeconds > 0.0) {
+        (playbackPosition / durationSeconds).toFloat().coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     Box(
         modifier = Modifier
@@ -385,27 +417,116 @@ private fun PlayerScreen(
         key(video.videoId) {
             YouTubePlayer(
                 video = video,
-                onProgress = onProgress,
-                onEnded = onEnded,
+                onProgress = { videoId, position, duration ->
+                    playbackPosition = position
+                    if (duration > 0.0) {
+                        durationSeconds = duration
+                    }
+
+                    if (
+                        abs(position - lastPersistedPosition) >= 5.0 ||
+                        (duration > 0.0 && position / duration >= 0.95)
+                    ) {
+                        onProgress(videoId, position, duration)
+                        lastPersistedPosition = position
+                    }
+                },
+                onPlaybackState = { state ->
+                    playbackState = state
+
+                    if (state == "PAUSED") {
+                        persistProgress()
+                    }
+                },
+                onEnded = { videoId ->
+                    persistProgress()
+                    onEnded(videoId)
+                },
             )
         }
 
         Column(
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(28.dp),
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.78f))
+                .padding(horizontal = 36.dp, vertical = 22.dp),
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(0.82f),
+                ) {
+                    Text(
+                        text = video.title,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    Text(
+                        text = publishedLabel(video.publishedAt),
+                        color = DeepenMuted,
+                        fontSize = 14.sp,
+                    )
+                }
+
+                Text(
+                    text = playbackState,
+                    color = if (playbackState == "PLAYING") DeepenBlue else Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(DeepenTrack),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(DeepenBlue),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(9.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                )
+
+                Text(
+                    text = "OK Play/Pause  ·  ← 10s  ·  → 30s  ·  Back Journey",
+                    color = DeepenMuted,
+                    fontSize = 14.sp,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Text(
-                text = video.title,
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "OK Play/Pause  ·  ← 10s  ·  → 30s  ·  Back Journey",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 14.sp,
+                text = "Deepen will continue automatically to the next message when this one finishes.",
+                color = DeepenMuted.copy(alpha = 0.8f),
+                fontSize = 12.sp,
             )
         }
     }
@@ -416,6 +537,7 @@ private fun PlayerScreen(
 private fun YouTubePlayer(
     video: VideoItem,
     onProgress: (String, Double, Double) -> Unit,
+    onPlaybackState: (String) -> Unit,
     onEnded: (String) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -439,6 +561,7 @@ private fun YouTubePlayer(
                     PlayerBridge(
                         videoId = video.videoId,
                         onProgress = onProgress,
+                        onPlaybackState = onPlaybackState,
                         onEnded = onEnded,
                     ),
                     "AndroidBridge",
@@ -504,6 +627,7 @@ private fun YouTubePlayer(
 private class PlayerBridge(
     private val videoId: String,
     private val onProgress: (String, Double, Double) -> Unit,
+    private val onPlaybackState: (String) -> Unit,
     private val onEnded: (String) -> Unit,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -515,6 +639,13 @@ private class PlayerBridge(
     ) {
         mainHandler.post {
             onProgress(videoId, currentSeconds, durationSeconds)
+        }
+    }
+
+    @JavascriptInterface
+    fun onPlaybackState(state: String) {
+        mainHandler.post {
+            onPlaybackState(state)
         }
     }
 
@@ -572,6 +703,8 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerReady(event) {
+                    AndroidBridge.onPlaybackState('READY');
+
                     if ($startSeconds > 0) {
                         event.target.seekTo($startSeconds, true);
                     }
@@ -589,7 +722,18 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerStateChange(event) {
+                    if (event.data === YT.PlayerState.PLAYING) {
+                        AndroidBridge.onPlaybackState('PLAYING');
+                    } else if (event.data === YT.PlayerState.PAUSED) {
+                        AndroidBridge.onPlaybackState('PAUSED');
+                    } else if (event.data === YT.PlayerState.BUFFERING) {
+                        AndroidBridge.onPlaybackState('BUFFERING');
+                    } else if (event.data === YT.PlayerState.CUED) {
+                        AndroidBridge.onPlaybackState('READY');
+                    }
+
                     if (event.data === YT.PlayerState.ENDED) {
+                        AndroidBridge.onPlaybackState('ENDED');
                         if (progressTimer) {
                             clearInterval(progressTimer);
                         }
