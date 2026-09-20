@@ -49,6 +49,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rw.kitech.deepen.data.JourneyStats
@@ -391,6 +392,31 @@ private fun PlayerScreen(
     var lastPersistedPosition by remember(video.videoId) {
         mutableStateOf(video.progressSeconds)
     }
+    var overlayVisible by remember(video.videoId) {
+        mutableStateOf(true)
+    }
+    var controlPulse by remember(video.videoId) {
+        mutableStateOf(0)
+    }
+    var controlFeedback by remember(video.videoId) {
+        mutableStateOf<String?>(null)
+    }
+
+    LaunchedEffect(playbackState, controlPulse) {
+        if (playbackState == "PLAYING") {
+            delay(3000)
+            overlayVisible = false
+        } else {
+            overlayVisible = true
+        }
+    }
+
+    LaunchedEffect(controlPulse) {
+        if (controlPulse > 0) {
+            delay(900)
+            controlFeedback = null
+        }
+    }
 
     fun persistProgress() {
         onProgress(
@@ -425,6 +451,13 @@ private fun PlayerScreen(
                     if (duration > 0.0) {
                         durationSeconds = duration
                     }
+                    if (
+                        position > 0.0 &&
+                        (playbackState == "LOADING" || playbackState == "READY")
+                    ) {
+                        playbackState = "PLAYING"
+                        playbackError = null
+                    }
 
                     if (
                         abs(position - lastPersistedPosition) >= 5.0 ||
@@ -448,11 +481,38 @@ private fun PlayerScreen(
                     playbackState = "ERROR"
                     playbackError = playerErrorMessage(code)
                 },
+                onControl = { action ->
+                    overlayVisible = true
+                    controlPulse += 1
+                    controlFeedback = when (action) {
+                        "SEEK_BACK" -> "−10s"
+                        "SEEK_FORWARD" -> "+30s"
+                        "TOGGLE" -> if (playbackState == "PLAYING") "Pause" else "Play"
+                        else -> null
+                    }
+                },
                 onEnded = { videoId ->
                     persistProgress()
                     onEnded(videoId)
                 },
             )
+        }
+
+        controlFeedback?.let { message ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .padding(horizontal = 26.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = message,
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
         playbackError?.let { message ->
@@ -487,89 +547,86 @@ private fun PlayerScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.78f))
-                .padding(horizontal = 36.dp, vertical = 22.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        if (overlayVisible) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .padding(horizontal = 36.dp, vertical = 18.dp),
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(0.82f),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = video.title,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(0.82f),
+                    ) {
+                        Text(
+                            text = video.title,
+                            color = Color.White,
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    Text(
-                        text = publishedLabel(video.publishedAt),
-                        color = DeepenMuted,
-                        fontSize = 14.sp,
+                        Text(
+                            text = publishedLabel(video.publishedAt),
+                            color = DeepenMuted,
+                            fontSize = 13.sp,
+                        )
+                    }
+
+                    if (playbackState != "PLAYING") {
+                        Text(
+                            text = playbackState,
+                            color = if (playbackState == "ERROR") DeepenError else Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(13.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(DeepenTrack),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress)
+                            .background(DeepenBlue),
                     )
                 }
 
-                Text(
-                    text = playbackState,
-                    color = if (playbackState == "PLAYING") DeepenBlue else Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                    )
+
+                    Text(
+                        text = "OK Play/Pause  ·  ← 10s  ·  → 30s  ·  Back",
+                        color = DeepenMuted,
+                        fontSize = 13.sp,
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(DeepenTrack),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(DeepenBlue),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(9.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                )
-
-                Text(
-                    text = "OK Play/Pause  ·  ← 10s  ·  → 30s  ·  Back Journey",
-                    color = DeepenMuted,
-                    fontSize = 14.sp,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = "Deepen will continue automatically to the next message when this one finishes.",
-                color = DeepenMuted.copy(alpha = 0.8f),
-                fontSize = 12.sp,
-            )
+        }
         }
     }
 }
@@ -581,6 +638,7 @@ private fun YouTubePlayer(
     onProgress: (String, Double, Double) -> Unit,
     onPlaybackState: (String) -> Unit,
     onPlaybackError: (String) -> Unit,
+    onControl: (String) -> Unit,
     onEnded: (String) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -615,26 +673,35 @@ private fun YouTubePlayer(
                 isFocusableInTouchMode = true
 
                 setOnKeyListener { _, keyCode, event ->
-                    if (event.action != AndroidKeyEvent.ACTION_DOWN) {
-                        return@setOnKeyListener false
-                    }
-
-                    val script = when (keyCode) {
+                    val action = when (keyCode) {
                         AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                         AndroidKeyEvent.KEYCODE_ENTER,
-                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "togglePlayback();"
-
-                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "seekBy(-10);"
-                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "seekBy(30);"
+                        AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> "SEEK_BACK"
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> "SEEK_FORWARD"
                         else -> null
                     }
 
-                    if (script != null) {
-                        evaluateJavascript(script, null)
-                        true
-                    } else {
-                        false
+                    if (action == null) {
+                        return@setOnKeyListener false
                     }
+
+                    if (
+                        event.action == AndroidKeyEvent.ACTION_DOWN &&
+                        event.repeatCount == 0
+                    ) {
+                        val script = when (action) {
+                            "TOGGLE" -> "togglePlayback();"
+                            "SEEK_BACK" -> "seekBy(-10);"
+                            "SEEK_FORWARD" -> "seekBy(30);"
+                            else -> ""
+                        }
+
+                        onControl(action)
+                        evaluateJavascript(script, null)
+                    }
+
+                    true
                 }
 
                 loadDataWithBaseURL(
@@ -763,6 +830,9 @@ private fun youtubePlayerHtml(
                             controls: 0,
                             rel: 0,
                             playsinline: 1,
+                            cc_load_policy: 0,
+                            iv_load_policy: 3,
+                            disablekb: 1,
                             enablejsapi: 1,
                             origin: 'https://rw.kitech.deepen',
                             widget_referrer: 'https://rw.kitech.deepen'
@@ -790,9 +860,18 @@ private fun youtubePlayerHtml(
 
                         var current = player.getCurrentTime() || 0;
                         var duration = player.getDuration() || 0;
+                        var state = player.getPlayerState();
+
+                        if (state === YT.PlayerState.PLAYING) {
+                            AndroidBridge.onPlaybackState('PLAYING');
+                        } else if (state === YT.PlayerState.PAUSED) {
+                            AndroidBridge.onPlaybackState('PAUSED');
+                        } else if (state === YT.PlayerState.BUFFERING) {
+                            AndroidBridge.onPlaybackState('BUFFERING');
+                        }
 
                         AndroidBridge.onProgress(current, duration);
-                    }, 5000);
+                    }, 2000);
                 }
 
                 function onPlayerStateChange(event) {
