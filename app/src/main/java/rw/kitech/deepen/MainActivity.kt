@@ -627,7 +627,6 @@ private fun PlayerScreen(
                 }
             }
         }
-        }
     }
 }
 
