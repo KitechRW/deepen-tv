@@ -471,7 +471,7 @@ private fun PlayerScreen(
 
     LaunchedEffect(playbackState, controlPulse) {
         if (playbackState == "PLAYING") {
-            delay(4000)
+            delay(5000)
             overlayVisible = false
         } else {
             overlayVisible = true
@@ -636,44 +636,37 @@ private fun PlayerScreen(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(72.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.96f),
-                            Color.Black.copy(alpha = 0.88f),
-                            Color.Black.copy(alpha = 0.58f),
-                        )
-                    )
-                ),
-        )
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(18.dp, 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(
-                painter = painterResource(R.drawable.deepen_icon),
-                contentDescription = "Deepen",
+        if (overlayVisible) {
+            Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(9.dp)),
-                contentScale = ContentScale.Crop,
-                alpha = 0.78f,
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .background(Color.Black),
             )
-            Spacer(modifier = Modifier.width(9.dp))
-            Text(
-                text = "DEEPEN",
-                color = Color.White.copy(alpha = 0.78f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            )
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(18.dp, 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.deepen_icon),
+                    contentDescription = "Deepen",
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(9.dp)),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(modifier = Modifier.width(9.dp))
+                Text(
+                    text = "DEEPEN",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
 
         if (skipArmed) {
@@ -681,7 +674,7 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.82f))
+                    .background(Color.Black)
                     .padding(horizontal = 28.dp, vertical = 18.dp),
             ) {
                 Text(
@@ -698,7 +691,7 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black.copy(alpha = 0.72f))
+                    .background(Color.Black)
                     .padding(horizontal = 26.dp, vertical = 16.dp),
             ) {
                 Text(
@@ -747,7 +740,7 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.72f))
+                    .background(Color.Black)
                     .padding(horizontal = 36.dp, vertical = 18.dp),
             ) {
                 Row(
