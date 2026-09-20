@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.nativeKeyEvent\nimport androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,7 +75,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun DeepenApp() {
-    val store = remember { VideoStore(androidx.compose.ui.platform.LocalContext.current.applicationContext) }
+    val context = LocalContext.current
+    val store = remember(context) { VideoStore(context.applicationContext) }
     val scope = rememberCoroutineScope()
 
     var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
