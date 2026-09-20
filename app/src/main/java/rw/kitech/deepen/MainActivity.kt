@@ -557,8 +557,16 @@ private fun PlayerScreen(
                     playbackError = playerErrorMessage(code)
                 },
                 onControl = { action ->
-                    overlayVisible = true
                     controlPulse += 1
+
+                    if (action == "HIDE") {
+                        overlayVisible = false
+                        skipArmed = false
+                        pendingSeekSeconds = 0
+                        controlFeedback = null
+                    } else {
+                        overlayVisible = true
+                    }
 
                     when (action) {
                         "SEEK_BACK" -> {
@@ -617,6 +625,8 @@ private fun PlayerScreen(
                             pendingSeekSeconds = 0
                             controlFeedback = null
                         }
+
+                        "HIDE" -> Unit
                     }
                 },
                 onEnded = { videoId ->
@@ -626,10 +636,26 @@ private fun PlayerScreen(
             )
         }
 
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(72.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.96f),
+                            Color.Black.copy(alpha = 0.88f),
+                            Color.Black.copy(alpha = 0.58f),
+                        )
+                    )
+                ),
+        )
+
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(24.dp),
+                .padding(18.dp, 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
@@ -789,7 +815,7 @@ private fun PlayerScreen(
                     )
 
                     Text(
-                        text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Controls  ·  ↓ Skip  ·  Back",
+                        text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Hide  ·  ↓ Skip  ·  Back",
                         color = DeepenMuted,
                         fontSize = 13.sp,
                     )
@@ -830,7 +856,7 @@ private fun YouTubePlayer(
                 AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
                 AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "SEEK_FORWARD"
 
-                AndroidKeyEvent.KEYCODE_DPAD_UP -> "SHOW"
+                AndroidKeyEvent.KEYCODE_DPAD_UP -> "HIDE"
 
                 AndroidKeyEvent.KEYCODE_DPAD_DOWN,
                 AndroidKeyEvent.KEYCODE_MEDIA_NEXT -> "SKIP"
@@ -897,8 +923,8 @@ private fun YouTubePlayer(
                     "AndroidBridge",
                 )
 
-                isFocusable = true
-                isFocusableInTouchMode = true
+                isFocusable = false
+                isFocusableInTouchMode = false
 
                 loadDataWithBaseURL(
                     "https://rw.kitech.deepen/",
@@ -913,7 +939,6 @@ private fun YouTubePlayer(
                     null,
                 )
 
-                requestFocus()
                 webView = this
             }
         },
