@@ -822,7 +822,6 @@ private fun PlayerScreen(
                 )
             }
         }
-        }
     }
 }
 
