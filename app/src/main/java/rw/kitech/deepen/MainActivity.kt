@@ -15,7 +15,6 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
@@ -46,11 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -265,8 +261,11 @@ private fun HomeScreen(
             .fillMaxSize()
             .background(DeepenBackground),
     ) {
-        DeepenHeroBackground(
+        Image(
+            painter = painterResource(R.drawable.deepen_home_background_exact),
+            contentDescription = null,
             modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
         )
 
         Box(
@@ -578,6 +577,16 @@ private fun DeepenPlayButton(
                 focusedShape = pill,
                 pressedShape = pill,
             ),
+            colors = ButtonDefaults.colors(
+                containerColor = Color(0xFF208BFF),
+                contentColor = Color.White,
+                focusedContainerColor = Color(0xFF35B9FF),
+                focusedContentColor = Color.White,
+                pressedContainerColor = Color(0xFF1378E8),
+                pressedContentColor = Color.White,
+                disabledContainerColor = Color(0xFF31516E),
+                disabledContentColor = Color(0xFFB8C7D6),
+            ),
             contentPadding = PaddingValues(
                 horizontal = 28.dp,
                 vertical = 15.dp,
@@ -641,6 +650,16 @@ private fun DeepenSyncButton(
                 focusedShape = pill,
                 pressedShape = pill,
             ),
+            colors = ButtonDefaults.colors(
+                containerColor = Color(0xFF0A1525),
+                contentColor = Color.White,
+                focusedContainerColor = Color(0xFF164F86),
+                focusedContentColor = Color.White,
+                pressedContainerColor = Color(0xFF0E355C),
+                pressedContentColor = Color.White,
+                disabledContainerColor = Color(0xFF111A25),
+                disabledContentColor = Color(0xFF708090),
+            ),
             contentPadding = PaddingValues(
                 horizontal = 20.dp,
                 vertical = 11.dp,
@@ -660,144 +679,6 @@ private fun DeepenSyncButton(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-    }
-}
-
-@Composable
-private fun DeepenHeroBackground(
-    modifier: Modifier = Modifier,
-) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color(0xFF020711),
-                    Color(0xFF061633),
-                    Color(0xFF0A4BA8),
-                    Color(0xFF072B65),
-                ),
-                start = Offset(0f, 0f),
-                end = Offset(w, h),
-            ),
-        )
-
-        val dLeft = w * 0.60f
-        val dTop = h * 0.14f
-        val dBottom = h * 0.72f
-        val dRight = w * 0.93f
-        val centerY = (dTop + dBottom) / 2f
-
-        fun dPath(insetX: Float, insetY: Float): Path {
-            val left = dLeft + insetX
-            val top = dTop + insetY
-            val bottom = dBottom - insetY
-            val right = dRight - insetX * 0.45f
-
-            return Path().apply {
-                moveTo(left, top)
-                lineTo(left, bottom)
-                cubicTo(
-                    right, bottom,
-                    right, top,
-                    left, top,
-                )
-            }
-        }
-
-        val dLayers = listOf(
-            Triple(0f, 0f, 82f),
-            Triple(w * 0.035f, h * 0.055f, 48f),
-            Triple(w * 0.066f, h * 0.105f, 30f),
-            Triple(w * 0.092f, h * 0.148f, 18f),
-        )
-
-        dLayers.forEachIndexed { index, (ix, iy, stroke) ->
-            drawPath(
-                path = dPath(ix, iy),
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF123B86).copy(alpha = 0.80f),
-                        Color(0xFF30BFFF).copy(alpha = 0.96f),
-                        Color(0xFF8BEAFF).copy(alpha = 0.88f),
-                    ),
-                    startX = dLeft,
-                    endX = dRight,
-                ),
-                style = Stroke(width = stroke),
-            )
-
-            drawPath(
-                path = dPath(ix, iy),
-                color = Color(0xFFB8F3FF).copy(alpha = 0.56f - index * 0.08f),
-                style = Stroke(width = 2.3f),
-            )
-        }
-
-        val lightCenter = Offset(w * 0.715f, centerY)
-
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.92f),
-                    Color(0xFF7FE8FF).copy(alpha = 0.62f),
-                    Color(0xFF278EFF).copy(alpha = 0.24f),
-                    Color.Transparent,
-                ),
-                center = lightCenter,
-                radius = w * 0.15f,
-            ),
-            radius = w * 0.15f,
-            center = lightCenter,
-        )
-
-        val road = Path().apply {
-            moveTo(w * 0.36f, h)
-            cubicTo(
-                w * 0.49f, h * 0.82f,
-                w * 0.66f, h * 0.70f,
-                w * 0.68f, h * 0.60f,
-            )
-            cubicTo(
-                w * 0.70f, h * 0.51f,
-                w * 0.68f, h * 0.47f,
-                lightCenter.x, lightCenter.y,
-            )
-        }
-
-        drawPath(
-            path = road,
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    Color(0xFF086BFF).copy(alpha = 0.18f),
-                    Color(0xFF27A7FF).copy(alpha = 0.55f),
-                    Color(0xFF8CEEFF).copy(alpha = 0.96f),
-                ),
-                start = Offset(w * 0.38f, h),
-                end = lightCenter,
-            ),
-            style = Stroke(width = w * 0.085f),
-        )
-
-        drawPath(
-            path = road,
-            color = Color(0xFFC5F7FF).copy(alpha = 0.74f),
-            style = Stroke(width = 2.2f),
-        )
-
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    Color(0xFF05152A).copy(alpha = 0.18f),
-                    Color(0xFF020711).copy(alpha = 0.62f),
-                ),
-                startY = h * 0.52f,
-                endY = h,
-            ),
-        )
     }
 }
 
