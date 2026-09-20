@@ -670,32 +670,52 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(46.dp)
+                    .height(52.dp)
                     .background(Color.Black),
             )
 
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
                     painter = painterResource(R.drawable.deepen_icon),
                     contentDescription = "Deepen",
                     modifier = Modifier
-                        .size(26.dp)
-                        .clip(RoundedCornerShape(7.dp)),
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
                 )
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = "DEEPEN",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column {
+                    Text(
+                        text = "DEEPEN",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "From the beginning",
+                        color = DeepenMuted,
+                        fontSize = 10.sp,
+                    )
+                }
             }
+        } else {
+            Image(
+                painter = painterResource(R.drawable.deepen_icon),
+                contentDescription = "Deepen",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .size(26.dp)
+                    .clip(RoundedCornerShape(7.dp)),
+                contentScale = ContentScale.Crop,
+            )
         }
 
         if (skipArmed) {
