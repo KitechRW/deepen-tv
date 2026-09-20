@@ -10,6 +10,13 @@ val escapedYouTubeApiKey = youtubeApiKey.get()
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
+val deepenKeystorePath = providers.gradleProperty("DEEPEN_KEYSTORE_PATH").orElse("")
+val deepenKeystorePassword = providers.gradleProperty("DEEPEN_KEYSTORE_PASSWORD").orElse("")
+val deepenKeyAlias = providers.gradleProperty("DEEPEN_KEY_ALIAS").orElse("")
+val deepenKeyPassword = providers.gradleProperty("DEEPEN_KEY_PASSWORD").orElse("")
+val deepenVersionCode = providers.gradleProperty("VERSION_CODE").orElse("2")
+val deepenVersionName = providers.gradleProperty("VERSION_NAME").orElse("0.2.0")
+
 android {
     namespace = "rw.kitech.deepen"
     compileSdk = 37
@@ -18,14 +25,33 @@ android {
         applicationId = "rw.kitech.deepen"
         minSdk = 23
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = deepenVersionCode.get().toInt()
+        versionName = deepenVersionName.get()
 
         buildConfigField(
             "String",
             "YOUTUBE_API_KEY",
             "\"$escapedYouTubeApiKey\""
         )
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = deepenKeystorePath.get()
+            if (keystorePath.isNotBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = deepenKeystorePassword.get()
+                keyAlias = deepenKeyAlias.get()
+                keyPassword = deepenKeyPassword.get()
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
     }
 
     buildFeatures {
