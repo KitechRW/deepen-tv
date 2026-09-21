@@ -828,6 +828,7 @@ private fun PlayerScreen(
                     if (state == "PAUSED") {
                         controlsForcedHidden = false
                         overlayVisible = true
+                        controlFeedback = null
                         persistProgress()
                     }
                 },
@@ -907,20 +908,19 @@ private fun PlayerScreen(
                                 "TOGGLE" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback =
-                                        if (playbackState == "PLAYING") "❚❚  PAUSE" else "▶  PLAY"
+                                    controlFeedback = null
                                 }
 
                                 "PLAY" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback = "▶  PLAY"
+                                    controlFeedback = null
                                 }
 
                                 "PAUSE" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback = "❚❚  PAUSE"
+                                    controlFeedback = null
                                 }
 
                                 "SHOW" -> {
@@ -989,7 +989,7 @@ private fun PlayerScreen(
                         horizontalAlignment = Alignment.End,
                     ) {
                         Text(
-                            text = "Dr. Paul Gitwaza  ·  ${video.publishedAt.take(4)}",
+                            text = "Dr. Paul Gitwaza",
                             color = DeepenMuted,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -1143,6 +1143,34 @@ private fun PlayerScreen(
                     text = "Press ↓ again to confirm",
                     color = DeepenMuted,
                     fontSize = 14.sp,
+                )
+            }
+        }
+
+        if (
+            playbackState == "PAUSED" &&
+            playbackError == null &&
+            !previousArmed &&
+            !skipArmed &&
+            controlFeedback == null
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 2.dp,
+                        color = DeepenBlue,
+                        shape = RoundedCornerShape(50),
+                    )
+                    .padding(horizontal = 30.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = "▶  PLAY",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
@@ -1759,7 +1787,7 @@ private fun publishedDateLabel(value: String): String {
 
 private fun publishedMonthDayLabel(value: String): String {
     val date = parsePublishedDate(value) ?: return value.take(10)
-    return SimpleDateFormat("MMMM d", Locale.US)
+    return SimpleDateFormat("MMMM d, yyyy", Locale.US)
         .format(date)
 }
 
