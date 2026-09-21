@@ -828,6 +828,7 @@ private fun PlayerScreen(
                     if (state == "PAUSED") {
                         controlsForcedHidden = false
                         overlayVisible = true
+                        controlFeedback = null
                         persistProgress()
                     }
                 },
@@ -907,20 +908,19 @@ private fun PlayerScreen(
                                 "TOGGLE" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback =
-                                        if (playbackState == "PLAYING") "❚❚  PAUSE" else "▶  PLAY"
+                                    controlFeedback = null
                                 }
 
                                 "PLAY" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback = "▶  PLAY"
+                                    controlFeedback = null
                                 }
 
                                 "PAUSE" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
-                                    controlFeedback = "❚❚  PAUSE"
+                                    controlFeedback = null
                                 }
 
                                 "SHOW" -> {
@@ -1143,6 +1143,34 @@ private fun PlayerScreen(
                     text = "Press ↓ again to confirm",
                     color = DeepenMuted,
                     fontSize = 14.sp,
+                )
+            }
+        }
+
+        if (
+            playbackState == "PAUSED" &&
+            playbackError == null &&
+            !previousArmed &&
+            !skipArmed &&
+            controlFeedback == null
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 2.dp,
+                        color = DeepenBlue,
+                        shape = RoundedCornerShape(50),
+                    )
+                    .padding(horizontal = 30.dp, vertical = 16.dp),
+            ) {
+                Text(
+                    text = "▶  PLAY",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
                 )
             }
         }
