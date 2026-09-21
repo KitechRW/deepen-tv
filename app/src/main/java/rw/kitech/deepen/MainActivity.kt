@@ -989,7 +989,7 @@ private fun PlayerScreen(
                         horizontalAlignment = Alignment.End,
                     ) {
                         Text(
-                            text = "Dr. Paul Gitwaza  ·  ${video.publishedAt.take(4)}",
+                            text = "Dr. Paul Gitwaza",
                             color = DeepenMuted,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -1759,7 +1759,7 @@ private fun publishedDateLabel(value: String): String {
 
 private fun publishedMonthDayLabel(value: String): String {
     val date = parsePublishedDate(value) ?: return value.take(10)
-    return SimpleDateFormat("MMMM d", Locale.US)
+    return SimpleDateFormat("MMMM d, yyyy", Locale.US)
         .format(date)
 }
 
