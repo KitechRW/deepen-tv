@@ -1758,9 +1758,6 @@ private fun youtubePlayerHtml(
 
                     if (event.data === YT.PlayerState.ENDED) {
                         AndroidBridge.onPlaybackState('ENDED');
-                        if (progressTimer) {
-                            clearInterval(progressTimer);
-                        }
 
                         var current = player.getCurrentTime() || 0;
                         var duration = player.getDuration() || 0;
