@@ -835,93 +835,100 @@ private fun PlayerScreen(
                 onControl = { action ->
                     controlPulse += 1
 
-                    if (action == "UP") {
-                        skipArmed = false
-                        pendingSeekSeconds = 0
-                        controlFeedback = null
-
-                        if (overlayVisible) {
-                            controlsForcedHidden = true
-                            overlayVisible = false
-                            previousArmed = false
-                        } else if (previousArmed) {
-                            previousArmed = false
-                            persistProgress()
-                            onPrevious(video.videoId) { moved ->
-                                if (!moved) {
-                                    controlFeedback = "BEGINNING OF ARCHIVE"
-                                    controlPulse += 1
-                                }
-                            }
-                        } else {
-                            controlsForcedHidden = true
-                            previousArmed = true
-                            previousArmPulse += 1
-                        }
-                    } else {
+                    if (!overlayVisible) {
                         controlsForcedHidden = false
                         overlayVisible = true
                         previousArmed = false
+                        skipArmed = false
+                        pendingSeekSeconds = 0
+                        controlFeedback = null
+                        false
+                    } else {
+                        controlsForcedHidden = false
 
-                        when (action) {
-                            "SEEK_BACK" -> {
-                                skipArmed = false
-                                pendingSeekSeconds -= 10
-                                controlFeedback = if (pendingSeekSeconds < 0) {
-                                    "↶  " + abs(pendingSeekSeconds) + " SEC"
-                                } else {
-                                    "↷  " + pendingSeekSeconds + " SEC"
+                        if (action == "UP") {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+
+                            if (previousArmed) {
+                                previousArmed = false
+                                persistProgress()
+                                onPrevious(video.videoId) { moved ->
+                                    if (!moved) {
+                                        controlFeedback = "BEGINNING OF ARCHIVE"
+                                        controlPulse += 1
+                                    }
                                 }
+                            } else {
+                                previousArmed = true
+                                previousArmPulse += 1
                             }
+                        } else {
+                            previousArmed = false
 
-                            "SEEK_FORWARD" -> {
-                                skipArmed = false
-                                pendingSeekSeconds += 30
-                                controlFeedback = if (pendingSeekSeconds < 0) {
-                                    "↶  " + abs(pendingSeekSeconds) + " SEC"
-                                } else {
-                                    "↷  " + pendingSeekSeconds + " SEC"
-                                }
-                            }
-
-                            "SKIP" -> {
-                                pendingSeekSeconds = 0
-                                controlFeedback = null
-                                if (skipArmed) {
+                            when (action) {
+                                "SEEK_BACK" -> {
                                     skipArmed = false
-                                    persistProgress()
-                                    onSkip(video.videoId)
-                                } else {
-                                    skipArmed = true
-                                    skipArmPulse += 1
+                                    pendingSeekSeconds -= 10
+                                    controlFeedback = if (pendingSeekSeconds < 0) {
+                                        "↶  " + abs(pendingSeekSeconds) + " SEC"
+                                    } else {
+                                        "↷  " + pendingSeekSeconds + " SEC"
+                                    }
                                 }
-                            }
 
-                            "TOGGLE" -> {
-                                skipArmed = false
-                                pendingSeekSeconds = 0
-                                controlFeedback =
-                                    if (playbackState == "PLAYING") "❚❚  PAUSE" else "▶  PLAY"
-                            }
+                                "SEEK_FORWARD" -> {
+                                    skipArmed = false
+                                    pendingSeekSeconds += 30
+                                    controlFeedback = if (pendingSeekSeconds < 0) {
+                                        "↶  " + abs(pendingSeekSeconds) + " SEC"
+                                    } else {
+                                        "↷  " + pendingSeekSeconds + " SEC"
+                                    }
+                                }
 
-                            "PLAY" -> {
-                                skipArmed = false
-                                pendingSeekSeconds = 0
-                                controlFeedback = "▶  PLAY"
-                            }
+                                "SKIP" -> {
+                                    pendingSeekSeconds = 0
+                                    controlFeedback = null
+                                    if (skipArmed) {
+                                        skipArmed = false
+                                        persistProgress()
+                                        onSkip(video.videoId)
+                                    } else {
+                                        skipArmed = true
+                                        skipArmPulse += 1
+                                    }
+                                }
 
-                            "PAUSE" -> {
-                                skipArmed = false
-                                pendingSeekSeconds = 0
-                                controlFeedback = "❚❚  PAUSE"
-                            }
+                                "TOGGLE" -> {
+                                    skipArmed = false
+                                    pendingSeekSeconds = 0
+                                    controlFeedback =
+                                        if (playbackState == "PLAYING") "❚❚  PAUSE" else "▶  PLAY"
+                                }
 
-                            "SHOW" -> {
-                                skipArmed = false
-                                pendingSeekSeconds = 0
-                                controlFeedback = null
+                                "PLAY" -> {
+                                    skipArmed = false
+                                    pendingSeekSeconds = 0
+                                    controlFeedback = "▶  PLAY"
+                                }
+
+                                "PAUSE" -> {
+                                    skipArmed = false
+                                    pendingSeekSeconds = 0
+                                    controlFeedback = "❚❚  PAUSE"
+                                }
+
+                                "SHOW" -> {
+                                    skipArmed = false
+                                    pendingSeekSeconds = 0
+                                    controlFeedback = null
+                                }
                             }
                         }
+
+                        true
                     }
                 },
                 onEnded = { videoId ->
@@ -1313,7 +1320,7 @@ private fun YouTubePlayer(
     onProgress: (String, Double, Double) -> Unit,
     onPlaybackState: (String) -> Unit,
     onPlaybackError: (String) -> Unit,
-    onControl: (String) -> Unit,
+    onControl: (String) -> Boolean,
     onEnded: (String) -> Unit,
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -1362,8 +1369,8 @@ private fun YouTubePlayer(
                         else -> ""
                     }
 
-                    onControl(action)
-                    if (script.isNotEmpty()) {
+                    val executeAction = onControl(action)
+                    if (executeAction && script.isNotEmpty()) {
                         webView?.evaluateJavascript(script, null)
                     }
                 }
