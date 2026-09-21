@@ -709,6 +709,9 @@ private fun PlayerScreen(
     var overlayVisible by remember(video.videoId) {
         mutableStateOf(true)
     }
+    var controlsForcedHidden by remember(video.videoId) {
+        mutableStateOf(false)
+    }
     var controlPulse by remember(video.videoId) {
         mutableStateOf(0)
     }
@@ -728,8 +731,10 @@ private fun PlayerScreen(
         mutableStateOf(0L)
     }
 
-    LaunchedEffect(playbackState, controlPulse) {
-        if (playbackState == "PLAYING") {
+    LaunchedEffect(playbackState, controlPulse, controlsForcedHidden) {
+        if (controlsForcedHidden) {
+            overlayVisible = false
+        } else if (playbackState == "PLAYING") {
             delay(5000)
             overlayVisible = false
         } else {
@@ -824,6 +829,7 @@ private fun PlayerScreen(
                             lastUpPressAt > 0L &&
                             now - lastUpPressAt <= 500L
 
+                        controlsForcedHidden = true
                         overlayVisible = false
                         skipArmed = false
                         pendingSeekSeconds = 0
@@ -837,6 +843,7 @@ private fun PlayerScreen(
                             lastUpPressAt = now
                         }
                     } else {
+                        controlsForcedHidden = false
                         overlayVisible = true
                         lastUpPressAt = 0L
 
@@ -845,9 +852,9 @@ private fun PlayerScreen(
                                 skipArmed = false
                                 pendingSeekSeconds -= 10
                                 controlFeedback = if (pendingSeekSeconds < 0) {
-                                    "−" + abs(pendingSeekSeconds) + "s"
+                                    "↶  " + abs(pendingSeekSeconds) + " SEC"
                                 } else {
-                                    "+" + pendingSeekSeconds + "s"
+                                    "↷  " + pendingSeekSeconds + " SEC"
                                 }
                             }
 
@@ -855,9 +862,9 @@ private fun PlayerScreen(
                                 skipArmed = false
                                 pendingSeekSeconds += 30
                                 controlFeedback = if (pendingSeekSeconds < 0) {
-                                    "−" + abs(pendingSeekSeconds) + "s"
+                                    "↶  " + abs(pendingSeekSeconds) + " SEC"
                                 } else {
-                                    "+" + pendingSeekSeconds + "s"
+                                    "↷  " + pendingSeekSeconds + " SEC"
                                 }
                             }
 
@@ -877,19 +884,20 @@ private fun PlayerScreen(
                             "TOGGLE" -> {
                                 skipArmed = false
                                 pendingSeekSeconds = 0
-                                controlFeedback = if (playbackState == "PLAYING") "Pause" else "Play"
+                                controlFeedback =
+                                    if (playbackState == "PLAYING") "❚❚  PAUSE" else "▶  PLAY"
                             }
 
                             "PLAY" -> {
                                 skipArmed = false
                                 pendingSeekSeconds = 0
-                                controlFeedback = "Play"
+                                controlFeedback = "▶  PLAY"
                             }
 
                             "PAUSE" -> {
                                 skipArmed = false
                                 pendingSeekSeconds = 0
-                                controlFeedback = "Pause"
+                                controlFeedback = "❚❚  PAUSE"
                             }
 
                             "SHOW" -> {
@@ -908,38 +916,62 @@ private fun PlayerScreen(
         }
 
         if (overlayVisible) {
-            Box(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .background(Color.Black),
-            )
-
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .fillMaxWidth(),
             ) {
-                Image(
-                    painter = painterResource(R.drawable.deepen_icon),
-                    contentDescription = "Deepen",
+                Row(
                     modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop,
-                )
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(Color.Black)
+                        .padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.deepen_icon),
+                            contentDescription = "Deepen",
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(9.dp)),
+                            contentScale = ContentScale.Crop,
+                        )
 
-                Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(11.dp))
 
-                Text(
-                    text = "DEEPEN - From the beginning",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                        Column {
+                            Text(
+                                text = "DEEPEN",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "From the beginning",
+                                color = DeepenMuted,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Dr. Paul Gitwaza  ·  ${video.publishedAt.take(4)}",
+                        color = DeepenMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(DeepenBlue),
                 )
             }
         } else {
@@ -955,19 +987,96 @@ private fun PlayerScreen(
             )
         }
 
-        if (skipArmed) {
+        if (
+            playbackError == null &&
+            (playbackState == "LOADING" || playbackState == "READY")
+        ) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(18.dp),
+                    )
+                    .padding(horizontal = 22.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.deepen_icon),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "DEEPEN",
+                        color = DeepenBlue,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Preparing teaching…",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        if (playbackState == "BUFFERING" && playbackError == null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black)
-                    .padding(horizontal = 28.dp, vertical = 18.dp),
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .padding(horizontal = 20.dp, vertical = 11.dp),
             ) {
                 Text(
-                    text = "Press ↓ again to mark viewed & skip",
+                    text = "DEEPEN  ·  BUFFERING…",
                     color = Color.White,
-                    fontSize = 20.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        if (skipArmed) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.50f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue,
+                        shape = RoundedCornerShape(18.dp),
+                    )
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "MARK AS WATCHED & CONTINUE?",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(7.dp))
+                Text(
+                    text = "Press ↓ again to confirm",
+                    color = DeepenMuted,
+                    fontSize = 14.sp,
                 )
             }
         }
@@ -976,48 +1085,76 @@ private fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.Black)
-                    .padding(horizontal = 26.dp, vertical = 16.dp),
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 2.dp,
+                        color = DeepenBlue.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .padding(horizontal = 26.dp, vertical = 15.dp),
             ) {
                 Text(
                     text = message,
                     color = Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
         }
 
         playbackError?.let { message ->
-            Box(
+            Column(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .fillMaxWidth(0.72f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color.Black.copy(alpha = 0.88f))
+                    .fillMaxWidth(0.68f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenError.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(20.dp),
+                    )
                     .padding(28.dp),
             ) {
-                Column {
-                    Text(
-                        text = "Playback problem",
-                        color = DeepenError,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.deepen_icon),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(9.dp)),
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = message,
-                        color = Color.White,
-                        fontSize = 17.sp,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Press Back to return to your journey.",
-                        color = DeepenMuted,
-                        fontSize = 14.sp,
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "DEEPEN",
+                            color = DeepenBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "Playback problem",
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = message,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Press Back to return to your journey.",
+                    color = DeepenMuted,
+                    fontSize = 13.sp,
+                )
             }
         }
 
@@ -1027,7 +1164,7 @@ private fun PlayerScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Color.Black)
-                    .padding(horizontal = 24.dp, vertical = 15.dp),
+                    .padding(horizontal = 26.dp, vertical = 17.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1037,48 +1174,89 @@ private fun PlayerScreen(
                     Text(
                         text = video.title,
                         color = Color.White,
-                        fontSize = 17.sp,
+                        fontSize = 18.sp,
+                        lineHeight = 22.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(0.70f),
+                        modifier = Modifier.fillMaxWidth(0.72f),
                     )
 
                     Text(
-                        text = "${formatPlaybackTime(playbackPosition)} / ${formatPlaybackTime(durationSeconds)}",
+                        text = "${formatPlaybackTime(playbackPosition)}  /  ${formatPlaybackTime(durationSeconds)}",
                         color = Color.White,
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(DeepenTrack),
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color(0xFF273242)),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(progress)
+                            .clip(RoundedCornerShape(5.dp))
                             .background(DeepenBlue),
                     )
                 }
 
-                Spacer(modifier = Modifier.height(9.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = "OK Play/Pause  ·  ← ×10s  ·  → ×30s  ·  ↑ Hide / ↑↑ Previous  ·  ↓ Skip  ·  Back",
-                    color = DeepenMuted,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PlayerControlChip("OK", "Play/Pause")
+                    PlayerControlChip("←", "10s")
+                    PlayerControlChip("→", "30s")
+                    PlayerControlChip("↑↑", "Previous")
+                    PlayerControlChip("↓", "Skip")
+                    PlayerControlChip("BACK", "Journey")
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerControlChip(
+    keyLabel: String,
+    actionLabel: String,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color(0xFF111A26))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(50),
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = keyLabel,
+            color = DeepenBlue,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = actionLabel,
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
