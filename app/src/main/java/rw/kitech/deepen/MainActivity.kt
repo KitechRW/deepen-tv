@@ -840,11 +840,7 @@ private fun PlayerScreen(
                         pendingSeekSeconds = 0
                         controlFeedback = null
 
-                        if (overlayVisible) {
-                            controlsForcedHidden = true
-                            overlayVisible = false
-                            previousArmed = false
-                        } else if (previousArmed) {
+                        if (previousArmed) {
                             previousArmed = false
                             persistProgress()
                             onPrevious(video.videoId) { moved ->
@@ -853,8 +849,12 @@ private fun PlayerScreen(
                                     controlPulse += 1
                                 }
                             }
+                        } else if (!overlayVisible) {
+                            controlsForcedHidden = false
+                            overlayVisible = true
                         } else {
-                            controlsForcedHidden = true
+                            controlsForcedHidden = false
+                            overlayVisible = true
                             previousArmed = true
                             previousArmPulse += 1
                         }
