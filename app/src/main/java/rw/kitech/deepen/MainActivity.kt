@@ -1537,7 +1537,7 @@ private fun YouTubePlayer(
                 )
             } else if (previousState?.active != active) {
                 view.evaluateJavascript(
-                    if (active) "playVideo();" else "pauseVideo();",
+                    "setDeepenActive(${if (active) "true" else "false"});",
                     null,
                 )
             }
@@ -1685,6 +1685,8 @@ private fun youtubePlayerHtml(
                 var pendingSeekDelta = 0;
                 var pendingSeekBase = null;
                 var seekCommitTimer = null;
+                var deepenActive = true;
+                var pendingVideoRequest = null;
 
                 function onYouTubeIframeAPIReady() {
                     player = new YT.Player('player', {
@@ -1724,11 +1726,21 @@ private fun youtubePlayerHtml(
                     setTimeout(disableCaptions, 300);
                     setTimeout(disableCaptions, 1200);
 
-                    if ($startSeconds > 0) {
-                        event.target.seekTo($startSeconds, true);
-                    }
+                    if (pendingVideoRequest) {
+                        var request = pendingVideoRequest;
+                        pendingVideoRequest = null;
+                        applyDeepenVideoRequest(request);
+                    } else {
+                        if ($startSeconds > 0) {
+                            event.target.seekTo($startSeconds, true);
+                        }
 
-                    event.target.playVideo();
+                        if (deepenActive) {
+                            event.target.playVideo();
+                        } else {
+                            event.target.pauseVideo();
+                        }
+                    }
 
                     progressTimer = setInterval(function() {
                         if (!player || typeof player.getCurrentTime !== 'function') return;
@@ -1777,8 +1789,8 @@ private fun youtubePlayerHtml(
                     AndroidBridge.onPlaybackState('READY');
                 }
 
-                function loadDeepenVideo(videoId, startSeconds, autoplay) {
-                    if (!player) return;
+                function applyDeepenVideoRequest(request) {
+                    if (!player || !request) return;
 
                     disableCaptions();
                     pendingSeekDelta = 0;
@@ -1789,16 +1801,46 @@ private fun youtubePlayerHtml(
                         seekCommitTimer = null;
                     }
 
-                    if (autoplay && typeof player.loadVideoById === 'function') {
+                    if (request.autoplay && typeof player.loadVideoById === 'function') {
                         player.loadVideoById({
-                            videoId: videoId,
-                            startSeconds: startSeconds || 0
+                            videoId: request.videoId,
+                            startSeconds: request.startSeconds || 0
                         });
                     } else if (typeof player.cueVideoById === 'function') {
                         player.cueVideoById({
-                            videoId: videoId,
-                            startSeconds: startSeconds || 0
+                            videoId: request.videoId,
+                            startSeconds: request.startSeconds || 0
                         });
+                    }
+                }
+
+                function loadDeepenVideo(videoId, startSeconds, autoplay) {
+                    deepenActive = !!autoplay;
+
+                    var request = {
+                        videoId: videoId,
+                        startSeconds: startSeconds || 0,
+                        autoplay: deepenActive
+                    };
+
+                    if (!player || typeof player.loadVideoById !== 'function') {
+                        pendingVideoRequest = request;
+                        return;
+                    }
+
+                    pendingVideoRequest = null;
+                    applyDeepenVideoRequest(request);
+                }
+
+                function setDeepenActive(active) {
+                    deepenActive = !!active;
+
+                    if (!player) return;
+
+                    if (deepenActive) {
+                        playVideo();
+                    } else {
+                        pauseVideo();
                     }
                 }
 
