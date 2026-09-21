@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -197,7 +196,7 @@ private fun DeepenApp() {
                     }
                 }
             },
-            onPrevious = { videoId ->
+            onPrevious = { videoId, onResult ->
                 scope.launch {
                     val previous = withContext(Dispatchers.IO) {
                         store.previousVideo(videoId)
@@ -205,6 +204,9 @@ private fun DeepenApp() {
 
                     if (previous != null) {
                         playerVideo = previous.copy(progressSeconds = 0.0)
+                        onResult(true)
+                    } else {
+                        onResult(false)
                     }
                 }
             },
@@ -688,7 +690,7 @@ private fun PlayerScreen(
     onProgress: (String, Double, Double) -> Unit,
     onEnded: (String) -> Unit,
     onSkip: (String) -> Unit,
-    onPrevious: (String) -> Unit,
+    onPrevious: (String, (Boolean) -> Unit) -> Unit,
     onExit: () -> Unit,
 ) {
     var playbackPosition by remember(video.videoId) {
@@ -727,8 +729,11 @@ private fun PlayerScreen(
     var skipArmPulse by remember(video.videoId) {
         mutableStateOf(0)
     }
-    var lastUpPressAt by remember(video.videoId) {
-        mutableStateOf(0L)
+    var previousArmed by remember(video.videoId) {
+        mutableStateOf(false)
+    }
+    var previousArmPulse by remember(video.videoId) {
+        mutableStateOf(0)
     }
 
     LaunchedEffect(playbackState, controlPulse, controlsForcedHidden) {
@@ -754,6 +759,13 @@ private fun PlayerScreen(
         if (skipArmed) {
             delay(2500)
             skipArmed = false
+        }
+    }
+
+    LaunchedEffect(previousArmPulse) {
+        if (previousArmed) {
+            delay(2500)
+            previousArmed = false
         }
     }
 
@@ -824,28 +836,32 @@ private fun PlayerScreen(
                     controlPulse += 1
 
                     if (action == "UP") {
-                        val now = SystemClock.elapsedRealtime()
-                        val isDoubleUp =
-                            lastUpPressAt > 0L &&
-                            now - lastUpPressAt <= 500L
-
-                        controlsForcedHidden = true
-                        overlayVisible = false
                         skipArmed = false
                         pendingSeekSeconds = 0
                         controlFeedback = null
 
-                        if (isDoubleUp) {
-                            lastUpPressAt = 0L
+                        if (overlayVisible) {
+                            controlsForcedHidden = true
+                            overlayVisible = false
+                            previousArmed = false
+                        } else if (previousArmed) {
+                            previousArmed = false
                             persistProgress()
-                            onPrevious(video.videoId)
+                            onPrevious(video.videoId) { moved ->
+                                if (!moved) {
+                                    controlFeedback = "BEGINNING OF ARCHIVE"
+                                    controlPulse += 1
+                                }
+                            }
                         } else {
-                            lastUpPressAt = now
+                            controlsForcedHidden = true
+                            previousArmed = true
+                            previousArmPulse += 1
                         }
                     } else {
                         controlsForcedHidden = false
                         overlayVisible = true
-                        lastUpPressAt = 0L
+                        previousArmed = false
 
                         when (action) {
                             "SEEK_BACK" -> {
@@ -980,9 +996,9 @@ private fun PlayerScreen(
                 contentDescription = "Deepen",
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .size(26.dp)
-                    .clip(RoundedCornerShape(7.dp)),
+                    .padding(start = 20.dp, top = 15.dp)
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(9.dp)),
                 contentScale = ContentScale.Crop,
             )
         }
@@ -1047,6 +1063,36 @@ private fun PlayerScreen(
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+
+        if (previousArmed) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.50f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF08111E))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue,
+                        shape = RoundedCornerShape(18.dp),
+                    )
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "GO TO PREVIOUS TEACHING?",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(7.dp))
+                Text(
+                    text = "Press ↑ again to confirm",
+                    color = DeepenMuted,
+                    fontSize = 14.sp,
                 )
             }
         }
@@ -1218,7 +1264,7 @@ private fun PlayerScreen(
                     PlayerControlChip("OK", "Play/Pause")
                     PlayerControlChip("←", "10s")
                     PlayerControlChip("→", "30s")
-                    PlayerControlChip("↑↑", "Previous")
+                    PlayerControlChip("↑", "Previous")
                     PlayerControlChip("↓", "Skip")
                     PlayerControlChip("BACK", "Journey")
                 }
