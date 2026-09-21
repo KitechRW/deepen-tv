@@ -133,6 +133,27 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    fun rewindToPrevious(videoId: String): VideoItem? {
+        val previous = previousVideo(videoId) ?: return null
+
+        val values = ContentValues().apply {
+            put("completed", 0)
+            put("progress_seconds", 0.0)
+        }
+
+        writableDatabase.update(
+            "videos",
+            values,
+            "video_id = ?",
+            arrayOf(previous.videoId),
+        )
+
+        return previous.copy(
+            completed = false,
+            progressSeconds = 0.0,
+        )
+    }
+
     fun stats(): JourneyStats {
         readableDatabase.rawQuery(
             """
