@@ -199,11 +199,12 @@ private fun DeepenApp() {
             onPrevious = { videoId, onResult ->
                 scope.launch {
                     val previous = withContext(Dispatchers.IO) {
-                        store.previousVideo(videoId)
+                        store.rewindToPrevious(videoId)
                     }
 
                     if (previous != null) {
-                        playerVideo = previous.copy(progressSeconds = 0.0)
+                        refreshLocalState()
+                        playerVideo = previous
                         onResult(true)
                     } else {
                         onResult(false)
@@ -825,6 +826,8 @@ private fun PlayerScreen(
                     }
 
                     if (state == "PAUSED") {
+                        controlsForcedHidden = false
+                        overlayVisible = true
                         persistProgress()
                     }
                 },
@@ -982,12 +985,22 @@ private fun PlayerScreen(
                         }
                     }
 
-                    Text(
-                        text = "Dr. Paul Gitwaza  ·  ${video.publishedAt.take(4)}",
-                        color = DeepenMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                    ) {
+                        Text(
+                            text = "Dr. Paul Gitwaza  ·  ${video.publishedAt.take(4)}",
+                            color = DeepenMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = publishedMonthDayLabel(video.publishedAt),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
 
                 Box(
@@ -1268,7 +1281,10 @@ private fun PlayerScreen(
                     horizontalArrangement = Arrangement.spacedBy(9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PlayerControlChip("OK", "Play/Pause")
+                    PlayerControlChip(
+                        "OK",
+                        if (playbackState == "PLAYING") "Pause" else "Play",
+                    )
                     PlayerControlChip("←", "10s")
                     PlayerControlChip("→", "30s")
                     PlayerControlChip("↑", "Previous")
@@ -1739,6 +1755,12 @@ private fun publishedDateLabel(value: String): String {
     return SimpleDateFormat("MMMM d, yyyy", Locale.US)
         .format(date)
         .uppercase(Locale.US)
+}
+
+private fun publishedMonthDayLabel(value: String): String {
+    val date = parsePublishedDate(value) ?: return value.take(10)
+    return SimpleDateFormat("MMMM d", Locale.US)
+        .format(date)
 }
 
 private val DeepenBlue = Color(0xFF3399FF)
