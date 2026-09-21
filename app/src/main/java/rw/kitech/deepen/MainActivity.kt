@@ -807,152 +807,150 @@ private fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        key(video.videoId) {
-            YouTubePlayer(
-                video = video,
-                active = active,
-                onProgress = { videoId, position, duration ->
-                    playbackPosition = position
-                    if (duration > 0.0) {
-                        durationSeconds = duration
-                    }
-                    if (
-                        position > 0.0 &&
-                        (playbackState == "LOADING" || playbackState == "READY")
-                    ) {
-                        playbackState = "PLAYING"
-                        playbackError = null
-                    }
+        YouTubePlayer(
+            video = video,
+            active = active,
+            onProgress = { videoId, position, duration ->
+            playbackPosition = position
+            if (duration > 0.0) {
+                durationSeconds = duration
+            }
+            if (
+                position > 0.0 &&
+                (playbackState == "LOADING" || playbackState == "READY")
+            ) {
+                playbackState = "PLAYING"
+                playbackError = null
+            }
 
-                    if (
-                        abs(position - lastPersistedPosition) >= 5.0 ||
-                        (duration > 0.0 && position / duration >= 0.95)
-                    ) {
-                        onProgress(videoId, position, duration)
-                        lastPersistedPosition = position
-                    }
-                },
-                onPlaybackState = { state ->
-                    playbackState = state
-                    if (state == "PLAYING") {
-                        playbackError = null
-                    }
+            if (
+                abs(position - lastPersistedPosition) >= 5.0 ||
+                (duration > 0.0 && position / duration >= 0.95)
+            ) {
+                onProgress(videoId, position, duration)
+                lastPersistedPosition = position
+            }
+            },
+            onPlaybackState = { state ->
+            playbackState = state
+            if (state == "PLAYING") {
+                playbackError = null
+            }
 
-                    if (state == "PAUSED") {
-                        controlsForcedHidden = false
-                        overlayVisible = true
-                        controlFeedback = null
-                        persistProgress()
-                    }
-                },
-                onPlaybackError = { code ->
-                    playbackState = "ERROR"
-                    playbackError = playerErrorMessage(code)
-                },
-                onControl = { action ->
-                    controlPulse += 1
+            if (state == "PAUSED") {
+                controlsForcedHidden = false
+                overlayVisible = true
+                controlFeedback = null
+                persistProgress()
+            }
+            },
+            onPlaybackError = { code ->
+            playbackState = "ERROR"
+            playbackError = playerErrorMessage(code)
+            },
+            onControl = { action ->
+            controlPulse += 1
 
-                    if (!overlayVisible) {
-                        controlsForcedHidden = false
-                        overlayVisible = true
+            if (!overlayVisible) {
+                controlsForcedHidden = false
+                overlayVisible = true
+                previousArmed = false
+                skipArmed = false
+                pendingSeekSeconds = 0
+                controlFeedback = null
+                false
+            } else {
+                controlsForcedHidden = false
+
+                if (action == "UP") {
+                    skipArmed = false
+                    pendingSeekSeconds = 0
+                    controlFeedback = null
+
+                    if (previousArmed) {
                         previousArmed = false
-                        skipArmed = false
-                        pendingSeekSeconds = 0
-                        controlFeedback = null
-                        false
-                    } else {
-                        controlsForcedHidden = false
-
-                        if (action == "UP") {
-                            skipArmed = false
-                            pendingSeekSeconds = 0
-                            controlFeedback = null
-
-                            if (previousArmed) {
-                                previousArmed = false
-                                persistProgress()
-                                onPrevious(video.videoId) { moved ->
-                                    if (!moved) {
-                                        controlFeedback = "BEGINNING OF ARCHIVE"
-                                        controlPulse += 1
-                                    }
-                                }
-                            } else {
-                                previousArmed = true
-                                previousArmPulse += 1
+                        persistProgress()
+                        onPrevious(video.videoId) { moved ->
+                            if (!moved) {
+                                controlFeedback = "BEGINNING OF ARCHIVE"
+                                controlPulse += 1
                             }
-                        } else {
-                            previousArmed = false
+                        }
+                    } else {
+                        previousArmed = true
+                        previousArmPulse += 1
+                    }
+                } else {
+                    previousArmed = false
 
-                            when (action) {
-                                "SEEK_BACK" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds -= 10
-                                    controlFeedback = if (pendingSeekSeconds < 0) {
-                                        "↶  " + abs(pendingSeekSeconds) + " SEC"
-                                    } else {
-                                        "↷  " + pendingSeekSeconds + " SEC"
-                                    }
-                                }
-
-                                "SEEK_FORWARD" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds += 30
-                                    controlFeedback = if (pendingSeekSeconds < 0) {
-                                        "↶  " + abs(pendingSeekSeconds) + " SEC"
-                                    } else {
-                                        "↷  " + pendingSeekSeconds + " SEC"
-                                    }
-                                }
-
-                                "SKIP" -> {
-                                    pendingSeekSeconds = 0
-                                    controlFeedback = null
-                                    if (skipArmed) {
-                                        skipArmed = false
-                                        persistProgress()
-                                        onSkip(video.videoId)
-                                    } else {
-                                        skipArmed = true
-                                        skipArmPulse += 1
-                                    }
-                                }
-
-                                "TOGGLE" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds = 0
-                                    controlFeedback = null
-                                }
-
-                                "PLAY" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds = 0
-                                    controlFeedback = null
-                                }
-
-                                "PAUSE" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds = 0
-                                    controlFeedback = null
-                                }
-
-                                "SHOW" -> {
-                                    skipArmed = false
-                                    pendingSeekSeconds = 0
-                                    controlFeedback = null
-                                }
+                    when (action) {
+                        "SEEK_BACK" -> {
+                            skipArmed = false
+                            pendingSeekSeconds -= 10
+                            controlFeedback = if (pendingSeekSeconds < 0) {
+                                "↶  " + abs(pendingSeekSeconds) + " SEC"
+                            } else {
+                                "↷  " + pendingSeekSeconds + " SEC"
                             }
                         }
 
-                        true
+                        "SEEK_FORWARD" -> {
+                            skipArmed = false
+                            pendingSeekSeconds += 30
+                            controlFeedback = if (pendingSeekSeconds < 0) {
+                                "↶  " + abs(pendingSeekSeconds) + " SEC"
+                            } else {
+                                "↷  " + pendingSeekSeconds + " SEC"
+                            }
+                        }
+
+                        "SKIP" -> {
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                            if (skipArmed) {
+                                skipArmed = false
+                                persistProgress()
+                                onSkip(video.videoId)
+                            } else {
+                                skipArmed = true
+                                skipArmPulse += 1
+                            }
+                        }
+
+                        "TOGGLE" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                        }
+
+                        "PLAY" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                        }
+
+                        "PAUSE" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                        }
+
+                        "SHOW" -> {
+                            skipArmed = false
+                            pendingSeekSeconds = 0
+                            controlFeedback = null
+                        }
                     }
-                },
-                onEnded = { videoId ->
-                    persistProgress()
-                    onEnded(videoId)
-                },
-            )
-        }
+                }
+
+                true
+            }
+            },
+            onEnded = { videoId ->
+            persistProgress()
+            onEnded(videoId)
+            },
+        )
 
         if (overlayVisible) {
             Column(
@@ -1475,7 +1473,21 @@ private fun YouTubePlayer(
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.loadsImagesAutomatically = true
 
-                webViewClient = WebViewClient()
+                val initialVideoId = video.videoId
+                val initialStartSeconds = (video.progressSeconds - 2.0)
+                    .coerceAtLeast(0.0)
+                    .roundToInt()
+                val initialActive = active
+
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String?) {
+                        super.onPageFinished(view, url)
+                        view.evaluateJavascript(
+                            "loadDeepenVideo('$initialVideoId', $initialStartSeconds, ${if (initialActive) "true" else "false"});",
+                            null,
+                        )
+                    }
+                }
                 webChromeClient = WebChromeClient()
 
                 CookieManager.getInstance().setAcceptCookie(true)
@@ -1489,15 +1501,11 @@ private fun YouTubePlayer(
                 isFocusable = false
                 isFocusableInTouchMode = false
 
-                val startSeconds = (video.progressSeconds - 2.0)
-                    .coerceAtLeast(0.0)
-                    .roundToInt()
-
                 loadDataWithBaseURL(
                     "https://rw.kitech.deepen/",
                     youtubePlayerHtml(
                         videoId = video.videoId,
-                        startSeconds = startSeconds,
+                        startSeconds = initialStartSeconds,
                     ),
                     "text/html",
                     "UTF-8",
@@ -1686,6 +1694,7 @@ private fun youtubePlayerHtml(
                 var pendingSeekBase = null;
                 var seekCommitTimer = null;
                 var deepenActive = true;
+                var deepenReady = false;
                 var pendingVideoRequest = null;
 
                 function onYouTubeIframeAPIReady() {
@@ -1694,7 +1703,7 @@ private fun youtubePlayerHtml(
                         height: '100%',
                         videoId: '$videoId',
                         playerVars: {
-                            autoplay: 1,
+                            autoplay: 0,
                             controls: 0,
                             rel: 0,
                             playsinline: 1,
@@ -1721,6 +1730,7 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerReady(event) {
+                    deepenReady = true;
                     AndroidBridge.onPlaybackState('READY');
                     disableCaptions();
                     setTimeout(disableCaptions, 300);
@@ -1823,7 +1833,7 @@ private fun youtubePlayerHtml(
                         autoplay: deepenActive
                     };
 
-                    if (!player || typeof player.loadVideoById !== 'function') {
+                    if (!deepenReady || !player || typeof player.loadVideoById !== 'function') {
                         pendingVideoRequest = request;
                         return;
                     }
@@ -1835,7 +1845,7 @@ private fun youtubePlayerHtml(
                 function setDeepenActive(active) {
                     deepenActive = !!active;
 
-                    if (!player) return;
+                    if (!deepenReady || !player) return;
 
                     if (deepenActive) {
                         playVideo();
