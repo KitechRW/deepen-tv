@@ -39,6 +39,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,9 +75,14 @@ import java.util.TimeZone
 
 class MainActivity : ComponentActivity() {
     private var tvPlayerKeyHandler: ((AndroidKeyEvent) -> Boolean)? = null
+    private var playerProgressSaveHandler: (() -> Unit)? = null
 
     fun setTvPlayerKeyHandler(handler: ((AndroidKeyEvent) -> Boolean)?) {
         tvPlayerKeyHandler = handler
+    }
+
+    fun setPlayerProgressSaveHandler(handler: (() -> Unit)?) {
+        playerProgressSaveHandler = handler
     }
 
     override fun dispatchKeyEvent(event: AndroidKeyEvent): Boolean {
@@ -97,6 +103,11 @@ class MainActivity : ComponentActivity() {
                 DeepenApp()
             }
         }
+    }
+
+    override fun onPause() {
+        playerProgressSaveHandler?.invoke()
+        super.onPause()
     }
 }
 
@@ -706,9 +717,6 @@ private fun PlayerScreen(
     var playbackError by remember(video.videoId) {
         mutableStateOf<String?>(null)
     }
-    var lastPersistedPosition by remember(video.videoId) {
-        mutableStateOf(video.progressSeconds)
-    }
     var overlayVisible by remember(video.videoId) {
         mutableStateOf(true)
     }
@@ -776,7 +784,21 @@ private fun PlayerScreen(
             playbackPosition,
             durationSeconds,
         )
-        lastPersistedPosition = playbackPosition
+    }
+
+    val activity = LocalContext.current as? MainActivity
+    val currentPersistProgress = rememberUpdatedState {
+        persistProgress()
+    }
+
+    DisposableEffect(activity, video.videoId) {
+        activity?.setPlayerProgressSaveHandler {
+            currentPersistProgress.value.invoke()
+        }
+
+        onDispose {
+            activity?.setPlayerProgressSaveHandler(null)
+        }
     }
 
     BackHandler {
@@ -811,13 +833,6 @@ private fun PlayerScreen(
                         playbackError = null
                     }
 
-                    if (
-                        abs(position - lastPersistedPosition) >= 5.0 ||
-                        (duration > 0.0 && position / duration >= 0.95)
-                    ) {
-                        onProgress(videoId, position, duration)
-                        lastPersistedPosition = position
-                    }
                 },
                 onPlaybackState = { state ->
                     playbackState = state
