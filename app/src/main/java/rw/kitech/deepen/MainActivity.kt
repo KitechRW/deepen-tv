@@ -820,7 +820,7 @@ private fun PlayerScreen(
         key(video.videoId) {
             YouTubePlayer(
                 video = video,
-                onProgress = { videoId, position, duration ->
+                onProgress = { _, position, duration ->
                     playbackPosition = position
                     if (duration > 0.0) {
                         durationSeconds = duration
@@ -832,7 +832,6 @@ private fun PlayerScreen(
                         playbackState = "PLAYING"
                         playbackError = null
                     }
-
                 },
                 onPlaybackState = { state ->
                     playbackState = state
