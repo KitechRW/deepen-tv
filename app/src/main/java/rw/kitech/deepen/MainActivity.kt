@@ -717,6 +717,12 @@ private fun PlayerScreen(
     var playbackError by remember(video.videoId) {
         mutableStateOf<String?>(null)
     }
+    var loadedFraction by remember(video.videoId) {
+        mutableStateOf(0.0)
+    }
+    var bufferAheadSeconds by remember(video.videoId) {
+        mutableStateOf(0.0)
+    }
     var overlayVisible by remember(video.videoId) {
         mutableStateOf(true)
     }
@@ -831,6 +837,14 @@ private fun PlayerScreen(
                     ) {
                         playbackState = "PLAYING"
                         playbackError = null
+                    }
+                },
+                onBufferTelemetry = { current, duration, loaded ->
+                    loadedFraction = loaded.coerceIn(0.0, 1.0)
+                    bufferAheadSeconds = if (duration > 0.0) {
+                        (loadedFraction * duration - current).coerceAtLeast(0.0)
+                    } else {
+                        0.0
                     }
                 },
                 onPlaybackState = { state ->
@@ -1080,23 +1094,30 @@ private fun PlayerScreen(
         }
 
         if (playbackState == "BUFFERING" && playbackError == null) {
-            Box(
+            Column(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .clip(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(18.dp))
                     .background(Color(0xFF08111E))
                     .border(
                         width = 1.dp,
                         color = DeepenBlue.copy(alpha = 0.65f),
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(18.dp),
                     )
-                    .padding(horizontal = 20.dp, vertical = 11.dp),
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = "DEEPEN  ·  BUFFERING…",
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Loaded ${(loadedFraction * 100).roundToInt()}%  ·  Ahead ≈ ${formatPlaybackTime(bufferAheadSeconds)}",
+                    color = DeepenMuted,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -1376,6 +1397,7 @@ private fun PlayerControlChip(
 private fun YouTubePlayer(
     video: VideoItem,
     onProgress: (String, Double, Double) -> Unit,
+    onBufferTelemetry: (Double, Double, Double) -> Unit,
     onPlaybackState: (String) -> Unit,
     onPlaybackError: (String) -> Unit,
     onControl: (String) -> Boolean,
@@ -1463,6 +1485,7 @@ private fun YouTubePlayer(
                     PlayerBridge(
                         videoId = video.videoId,
                         onProgress = onProgress,
+                        onBufferTelemetry = onBufferTelemetry,
                         onPlaybackState = onPlaybackState,
                         onPlaybackError = onPlaybackError,
                         onEnded = onEnded,
@@ -1506,6 +1529,7 @@ private fun YouTubePlayer(
 private class PlayerBridge(
     private val videoId: String,
     private val onProgress: (String, Double, Double) -> Unit,
+    private val onBufferTelemetry: (Double, Double, Double) -> Unit,
     private val onPlaybackState: (String) -> Unit,
     private val onPlaybackError: (String) -> Unit,
     private val onEnded: (String) -> Unit,
@@ -1516,9 +1540,11 @@ private class PlayerBridge(
     fun onProgress(
         currentSeconds: Double,
         durationSeconds: Double,
+        loadedFraction: Double,
     ) {
         mainHandler.post {
             onProgress(videoId, currentSeconds, durationSeconds)
+            onBufferTelemetry(currentSeconds, durationSeconds, loadedFraction)
         }
     }
 
@@ -1635,52 +1661,48 @@ private fun youtubePlayerHtml(
 
                     event.target.playVideo();
 
-                    progressTimer = setInterval(function() {
-                        if (!player || typeof player.getCurrentTime !== 'function') return;
+                    reportProgress();
+                    progressTimer = setInterval(reportProgress, 5000);
+                }
 
-                        var current = player.getCurrentTime() || 0;
-                        var duration = player.getDuration() || 0;
-                        var state = player.getPlayerState();
+                function reportProgress() {
+                    if (!player || typeof player.getCurrentTime !== 'function') return;
 
-                        if (state === YT.PlayerState.PLAYING) {
-                            disableCaptions();
-                            AndroidBridge.onPlaybackState('PLAYING');
-                        } else if (state === YT.PlayerState.PAUSED) {
-                            AndroidBridge.onPlaybackState('PAUSED');
-                        } else if (state === YT.PlayerState.BUFFERING) {
-                            AndroidBridge.onPlaybackState('BUFFERING');
-                        }
+                    var current = player.getCurrentTime() || 0;
+                    var duration = player.getDuration() || 0;
+                    var loaded = 0;
 
-                        AndroidBridge.onProgress(current, duration);
-                    }, 2000);
+                    if (typeof player.getVideoLoadedFraction === 'function') {
+                        loaded = player.getVideoLoadedFraction() || 0;
+                    }
+
+                    AndroidBridge.onProgress(current, duration, loaded);
                 }
 
                 function onPlayerStateChange(event) {
-                    disableCaptions();
-
                     if (event.data === YT.PlayerState.PLAYING) {
+                        disableCaptions();
                         var playerElement = document.getElementById('player');
                         if (playerElement) playerElement.style.opacity = '1';
                         var poster = document.getElementById('poster');
                         if (poster) poster.style.display = 'none';
                         AndroidBridge.onPlaybackState('PLAYING');
                     } else if (event.data === YT.PlayerState.PAUSED) {
+                        reportProgress();
                         AndroidBridge.onPlaybackState('PAUSED');
                     } else if (event.data === YT.PlayerState.BUFFERING) {
+                        reportProgress();
                         AndroidBridge.onPlaybackState('BUFFERING');
                     } else if (event.data === YT.PlayerState.CUED) {
                         AndroidBridge.onPlaybackState('READY');
                     }
 
                     if (event.data === YT.PlayerState.ENDED) {
+                        reportProgress();
                         AndroidBridge.onPlaybackState('ENDED');
                         if (progressTimer) {
                             clearInterval(progressTimer);
                         }
-
-                        var current = player.getCurrentTime() || 0;
-                        var duration = player.getDuration() || 0;
-                        AndroidBridge.onProgress(current, duration);
                         AndroidBridge.onEnded();
                     }
                 }
