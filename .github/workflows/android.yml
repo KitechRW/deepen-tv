@@ -62,7 +62,10 @@ jobs:
           DEEPEN_KEY_ALIAS: ${{ secrets.DEEPEN_KEY_ALIAS }}
           DEEPEN_KEY_PASSWORD: ${{ secrets.DEEPEN_KEY_PASSWORD }}
         run: |
-          gradle :app:assembleRelease             -PYOUTUBE_API_KEY="$YOUTUBE_API_KEY"             -PDEEPEN_KEYSTORE_PATH="$RUNNER_TEMP/deepen-release.jks"             -PDEEPEN_KEYSTORE_PASSWORD="$DEEPEN_KEYSTORE_PASSWORD"             -PDEEPEN_KEY_ALIAS="$DEEPEN_KEY_ALIAS"             -PDEEPEN_KEY_PASSWORD="$DEEPEN_KEY_PASSWORD"             -PVERSION_CODE="$GITHUB_RUN_NUMBER"             -PVERSION_NAME="0.2.$GITHUB_RUN_NUMBER"
+          set -a
+          source version.properties
+          set +a
+          gradle :app:assembleRelease             -PYOUTUBE_API_KEY="$YOUTUBE_API_KEY"             -PDEEPEN_KEYSTORE_PATH="$RUNNER_TEMP/deepen-release.jks"             -PDEEPEN_KEYSTORE_PASSWORD="$DEEPEN_KEYSTORE_PASSWORD"             -PDEEPEN_KEY_ALIAS="$DEEPEN_KEY_ALIAS"             -PDEEPEN_KEY_PASSWORD="$DEEPEN_KEY_PASSWORD"             -PVERSION_CODE="$VERSION_CODE"             -PVERSION_NAME="$VERSION_NAME"
           cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Deepen.apk
 
       - name: Upload debug APK
