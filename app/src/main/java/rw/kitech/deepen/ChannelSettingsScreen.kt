@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
@@ -71,6 +72,8 @@ internal fun ChannelSettingsScreen(
     onRemoveUserChannel: (ChannelSource) -> Unit,
     onBack: () -> Unit,
 ) {
+    var pendingDeleteChannel by remember { mutableStateOf<ChannelSource?>(null) }
+
     BackHandler(onBack = onBack)
 
     Box(
@@ -156,9 +159,24 @@ internal fun ChannelSettingsScreen(
                     selectedChannelId = selectedChannel.id,
                     defaultChannelId = defaultChannel.id,
                     onSelect = onSelectChannel,
-                    onRemove = onRemoveUserChannel,
+                    onDeleteRequest = { channel ->
+                        pendingDeleteChannel = channel
+                    },
                 )
             }
+        }
+
+        pendingDeleteChannel?.let { channel ->
+            DeleteChannelDialog(
+                channel = channel,
+                onDismiss = {
+                    pendingDeleteChannel = null
+                },
+                onConfirm = {
+                    pendingDeleteChannel = null
+                    onRemoveUserChannel(channel)
+                },
+            )
         }
     }
 }
@@ -308,7 +326,7 @@ private fun SelectedChannelPanel(
         ) {
             ChannelAvatar(
                 imageUrl = channel.thumbnailUrl,
-                contentDescription = channel.displayName,
+                contentDescription = channel.sourceName,
                 size = 72,
                 ring = true,
             )
@@ -329,7 +347,7 @@ private fun SelectedChannelPanel(
                 Spacer(modifier = Modifier.height(5.dp))
 
                 Text(
-                    text = channel.displayName,
+                    text = channel.sourceName,
                     color = Color.White,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -340,7 +358,7 @@ private fun SelectedChannelPanel(
                 Spacer(modifier = Modifier.height(3.dp))
 
                 Text(
-                    text = if (channel.featured) channel.sourceName else channel.secondaryLabel,
+                    text = channel.secondaryLabel,
                     color = ChannelSettingsMuted,
                     fontSize = 13.sp,
                     maxLines = 1,
@@ -387,7 +405,7 @@ private fun PersonalChannelRow(
     selectedChannelId: String,
     defaultChannelId: String,
     onSelect: (ChannelSource) -> Unit,
-    onRemove: (ChannelSource) -> Unit,
+    onDeleteRequest: (ChannelSource) -> Unit,
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -401,8 +419,13 @@ private fun PersonalChannelRow(
                 channel = channel,
                 selected = channel.id == selectedChannelId,
                 isDefault = channel.id == defaultChannelId,
-                onSelect = { onSelect(channel) },
-                onRemove = { onRemove(channel) },
+                onClick = {
+                    if (channel.id == selectedChannelId) {
+                        onDeleteRequest(channel)
+                    } else {
+                        onSelect(channel)
+                    }
+                },
             )
         }
     }
@@ -471,7 +494,7 @@ private fun FeaturedChannelCard(
             ) {
                 ChannelAvatar(
                     imageUrl = channel.thumbnailUrl,
-                    contentDescription = channel.displayName,
+                    contentDescription = channel.sourceName,
                     size = 42,
                     ring = false,
                 )
@@ -485,7 +508,7 @@ private fun FeaturedChannelCard(
             Spacer(modifier = Modifier.height(9.dp))
 
             Text(
-                text = channel.displayName,
+                text = channel.sourceName,
                 color = Color.White,
                 fontSize = 14.sp,
                 lineHeight = 17.sp,
@@ -502,147 +525,192 @@ private fun PersonalChannelCard(
     channel: ChannelSource,
     selected: Boolean,
     isDefault: Boolean,
-    onSelect: () -> Unit,
-    onRemove: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    var selectFocused by remember { mutableStateOf(false) }
-    var removeFocused by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(15.dp)
     val temporarySelection = selected && !isDefault
 
-    Column(
+    Button(
+        onClick = onClick,
         modifier = Modifier
             .width(230.dp)
-            .height(144.dp)
-            .background(
-                color = ChannelSettingsPanel.copy(alpha = 0.88f),
-                shape = shape,
-            )
+            .height(142.dp)
+            .onFocusChanged { focused = it.isFocused }
             .border(
                 width = when {
-                    selectFocused || removeFocused -> 2.dp
+                    focused -> 2.dp
                     temporarySelection -> 1.5.dp
                     else -> 1.dp
                 },
                 color = when {
-                    selectFocused || removeFocused -> Color(0xFFBDEBFF)
+                    focused -> Color(0xFFBDEBFF)
                     temporarySelection -> ChannelSettingsBlue.copy(alpha = 0.95f)
                     else -> Color.White.copy(alpha = 0.055f)
                 },
                 shape = shape,
             ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        scale = ButtonDefaults.scale(
+            scale = 1.0f,
+            focusedScale = 1.04f,
+            pressedScale = 0.985f,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = ChannelSettingsPanel.copy(alpha = 0.88f),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF153354),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF102844),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(
+            horizontal = 14.dp,
+            vertical = 13.dp,
+        ),
     ) {
-        Button(
-            onClick = onSelect,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(104.dp)
-                .onFocusChanged { selectFocused = it.isFocused },
-            shape = ButtonDefaults.shape(
-                shape = shape,
-                focusedShape = shape,
-                pressedShape = shape,
-            ),
-            scale = ButtonDefaults.scale(
-                scale = 1.0f,
-                focusedScale = 1.02f,
-                pressedScale = 0.985f,
-            ),
-            colors = ButtonDefaults.colors(
-                containerColor = Color.Transparent,
-                contentColor = Color.White,
-                focusedContainerColor = Color(0xFF153354).copy(alpha = 0.78f),
-                focusedContentColor = Color.White,
-                pressedContainerColor = Color(0xFF102844).copy(alpha = 0.82f),
-                pressedContentColor = Color.White,
-            ),
-            contentPadding = PaddingValues(
-                horizontal = 13.dp,
-                vertical = 11.dp,
-            ),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    ChannelAvatar(
-                        imageUrl = channel.thumbnailUrl,
-                        contentDescription = channel.displayName,
-                        size = 38,
-                        ring = false,
-                    )
+                ChannelAvatar(
+                    imageUrl = channel.thumbnailUrl,
+                    contentDescription = channel.sourceName,
+                    size = 42,
+                    ring = false,
+                )
 
-                    ChannelStateIcon(
-                        selected = temporarySelection,
-                        isDefault = isDefault,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(7.dp))
-
-                Text(
-                    text = channel.displayName,
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                ChannelStateIcon(
+                    selected = temporarySelection,
+                    isDefault = isDefault,
                 )
             }
-        }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(40.dp)
-                .padding(start = 13.dp, end = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+            Spacer(modifier = Modifier.height(9.dp))
+
+            Text(
+                text = channel.sourceName,
+                color = Color.White,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.height(5.dp))
+
             Text(
                 text = channel.secondaryLabel,
-                modifier = Modifier.weight(1f),
                 color = ChannelSettingsMuted.copy(alpha = 0.90f),
                 fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            RemoveChannelButton(
-                focused = removeFocused,
-                onFocusChanged = { removeFocused = it },
-                onClick = onRemove,
             )
         }
     }
 }
 
 @Composable
-private fun RemoveChannelButton(
-    focused: Boolean,
-    onFocusChanged: (Boolean) -> Unit,
+private fun DeleteChannelDialog(
+    channel: ChannelSource,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(430.dp)
+                .background(
+                    color = Color(0xFF07111F),
+                    shape = RoundedCornerShape(20.dp),
+                )
+                .border(
+                    width = 1.dp,
+                    color = ChannelSettingsBlue.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(20.dp),
+                )
+                .padding(26.dp),
+        ) {
+            Text(
+                text = "REMOVE CHANNEL?",
+                color = ChannelSettingsBlue,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = channel.sourceName,
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "This channel and its saved Deepen journey will be removed.",
+                color = ChannelSettingsMuted,
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+            )
+
+            Spacer(modifier = Modifier.height(22.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SettingsPillButton(
+                    label = "CANCEL",
+                    onClick = onDismiss,
+                )
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                DangerPillButton(
+                    label = "REMOVE",
+                    onClick = onConfirm,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DangerPillButton(
+    label: String,
     onClick: () -> Unit,
 ) {
+    var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(50)
 
     Button(
         onClick = onClick,
         modifier = Modifier
-            .height(28.dp)
-            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) {
                     Color(0xFFFFB4AB)
                 } else {
-                    Color.White.copy(alpha = 0.10f)
+                    Color(0xFFFF8A80).copy(alpha = 0.28f)
                 },
                 shape = shape,
             ),
@@ -657,18 +725,22 @@ private fun RemoveChannelButton(
             pressedScale = 0.98f,
         ),
         colors = ButtonDefaults.colors(
-            containerColor = Color(0xFF0A1320).copy(alpha = 0.78f),
-            contentColor = Color(0xFFBCC7D4),
-            focusedContainerColor = Color(0xFF4A2528),
+            containerColor = Color(0xFF2B1518),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF5A282D),
             focusedContentColor = Color.White,
-            pressedContainerColor = Color(0xFF371B1D),
+            pressedContainerColor = Color(0xFF3C1B1F),
             pressedContentColor = Color.White,
         ),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+        contentPadding = PaddingValues(
+            horizontal = 18.dp,
+            vertical = 9.dp,
+        ),
     ) {
         Text(
-            text = "REMOVE",
-            fontSize = 9.sp,
+            text = label,
+            color = Color.White,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
     }
