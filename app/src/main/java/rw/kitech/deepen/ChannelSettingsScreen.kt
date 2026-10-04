@@ -58,16 +58,8 @@ internal fun ChannelSettingsScreen(
     selectedChannel: ChannelSource,
     featuredChannels: List<ChannelSource>,
     userChannels: List<ChannelSource>,
-    searchOpen: Boolean,
-    searchQuery: String,
-    searchResults: List<ChannelSearchResult>,
-    searching: Boolean,
-    searchError: String?,
-    onSearchToggle: () -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
+    onSearchOpen: () -> Unit,
     onSelectChannel: (ChannelSource) -> Unit,
-    onAddSearchResult: (ChannelSearchResult) -> Unit,
     onSetDefault: (ChannelSource) -> Unit,
     onRemoveUserChannel: (ChannelSource) -> Unit,
     onBack: () -> Unit,
@@ -95,26 +87,11 @@ internal fun ChannelSettingsScreen(
                 ),
         ) {
             SettingsHeader(
-                searchOpen = searchOpen,
-                onSearchToggle = onSearchToggle,
+                onSearchOpen = onSearchOpen,
                 onBack = onBack,
             )
 
             Spacer(modifier = Modifier.height(18.dp))
-
-            if (searchOpen) {
-                SearchPanel(
-                    query = searchQuery,
-                    results = searchResults,
-                    searching = searching,
-                    error = searchError,
-                    onQueryChange = onSearchQueryChange,
-                    onSearch = onSearch,
-                    onAdd = onAddSearchResult,
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-            }
 
             SelectedChannelPanel(
                 channel = selectedChannel,
@@ -221,8 +198,7 @@ private fun SettingsAtmosphere() {
 
 @Composable
 private fun SettingsHeader(
-    searchOpen: Boolean,
-    onSearchToggle: () -> Unit,
+    onSearchOpen: () -> Unit,
     onBack: () -> Unit,
 ) {
     Row(
@@ -254,8 +230,9 @@ private fun SettingsHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SettingsPillButton(
-                label = if (searchOpen) "CLOSE SEARCH" else "⌕  SEARCH",
-                onClick = onSearchToggle,
+                label = "⌕  SEARCH",
+                onClick = onSearchOpen,
+                emphasized = true,
             )
 
             SettingsPillButton(
