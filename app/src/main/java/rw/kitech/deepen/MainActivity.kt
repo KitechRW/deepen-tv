@@ -1361,34 +1361,23 @@ private fun PlayerScreen(
                         }
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Column(
+                        horizontalAlignment = Alignment.End,
                     ) {
-                        HomeChannelAvatar(
-                            imageUrl = channel.thumbnailUrl,
-                            contentDescription = channel.sourceName,
+                        Text(
+                            text = channel.sourceName,
+                            color = DeepenMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(
-                            horizontalAlignment = Alignment.End,
-                        ) {
-                            Text(
-                                text = channel.sourceName,
-                                color = DeepenMuted,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = publishedMonthDayLabel(video.publishedAt),
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
+                        Text(
+                            text = publishedMonthDayLabel(video.publishedAt),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
 
