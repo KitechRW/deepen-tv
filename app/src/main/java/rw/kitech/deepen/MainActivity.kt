@@ -528,20 +528,20 @@ private fun HomeScreen(
             }
         }
 
-        DeepenSyncButton(
-            syncing = syncing,
-            onClick = onSync,
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 44.dp, end = 60.dp),
-        )
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DeepenSyncButton(
+                syncing = syncing,
+                onClick = onSync,
+            )
 
-        if (currentVideo == null) {
             DeepenSettingsButton(
                 onClick = onSettings,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 44.dp, end = 166.dp),
             )
         }
 
@@ -635,11 +635,6 @@ private fun HomeScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            DeepenSettingsButton(
-                                onClick = onSettings,
-                            )
                         }
                     }
 
