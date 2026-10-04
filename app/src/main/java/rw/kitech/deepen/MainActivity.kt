@@ -1118,6 +1118,12 @@ private fun PlayerScreen(
     var controlFeedback by remember(video.videoId) {
         mutableStateOf<String?>(null)
     }
+    var centerPlaybackControlVisible by remember(video.videoId) {
+        mutableStateOf(false)
+    }
+    var centerPlaybackControlPulse by remember(video.videoId) {
+        mutableStateOf(0)
+    }
     var pendingSeekSeconds by remember(video.videoId) {
         mutableStateOf(0)
     }
@@ -1157,11 +1163,21 @@ private fun PlayerScreen(
             overlayVisible = true
         } else if (controlsForcedHidden) {
             overlayVisible = false
-        } else if (playbackState == "PLAYING") {
+        } else if (
+            playbackState == "PLAYING" ||
+            playbackState == "PAUSED"
+        ) {
             delay(5000)
             overlayVisible = false
         } else {
             overlayVisible = true
+        }
+    }
+
+    LaunchedEffect(centerPlaybackControlPulse) {
+        if (centerPlaybackControlVisible) {
+            delay(1200)
+            centerPlaybackControlVisible = false
         }
     }
 
@@ -1487,12 +1503,16 @@ private fun PlayerScreen(
                                     if (playbackState == "PLAYING") {
                                         playbackState = "PAUSED"
                                     }
+                                    centerPlaybackControlVisible = true
+                                    centerPlaybackControlPulse += 1
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
                                 }
 
                                 "PLAY" -> {
+                                    centerPlaybackControlVisible = true
+                                    centerPlaybackControlPulse += 1
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -1500,6 +1520,8 @@ private fun PlayerScreen(
 
                                 "PAUSE" -> {
                                     playbackState = "PAUSED"
+                                    centerPlaybackControlVisible = true
+                                    centerPlaybackControlPulse += 1
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -1740,7 +1762,7 @@ private fun PlayerScreen(
         }
 
         if (
-            playbackState == "PAUSED" &&
+            centerPlaybackControlVisible &&
             playbackError == null &&
             !previousArmed &&
             !skipArmed &&
@@ -1750,7 +1772,7 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xE60A1320))
+                    .background(Color(0xFF0A1320))
                     .border(
                         width = 1.dp,
                         color = DeepenBlue.copy(alpha = 0.78f),
@@ -1759,8 +1781,8 @@ private fun PlayerScreen(
                     .padding(horizontal = 26.dp, vertical = 13.dp),
             ) {
                 Text(
-                    text = if (modeContextActive) {
-                        "OK  ·  SWITCH MODE"
+                    text = if (playbackState == "PLAYING") {
+                        "OK  ·  ❚❚ PAUSE"
                     } else {
                         "OK  ·  ▶ PLAY"
                     },
@@ -1859,10 +1881,20 @@ private fun PlayerScreen(
                         bottom = 22.dp,
                     )
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color(0xE60A101A))
+                    .background(
+                        if (playerMode == PlayerMode.LISTEN) {
+                            Color(0x660A101A)
+                        } else {
+                            Color(0xFF0A101A)
+                        },
+                    )
                     .border(
                         width = 1.dp,
-                        color = DeepenBlue.copy(alpha = 0.38f),
+                        color = if (playerMode == PlayerMode.LISTEN) {
+                            DeepenBlue.copy(alpha = 0.24f)
+                        } else {
+                            DeepenBlue.copy(alpha = 0.38f)
+                        },
                         shape = RoundedCornerShape(24.dp),
                     )
                     .padding(
