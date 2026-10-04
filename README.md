@@ -2,7 +2,7 @@
 
 **From the beginning.**
 
-Deepen is an open-source Android TV app for watching a YouTube teaching archive in chronological order — starting with the oldest available message and progressing toward the latest.
+Deepen is an open-source Android TV app for experiencing a YouTube channel from the beginning — starting with the oldest available video and progressing toward the latest.
 
 The MVP is built around one simple question:
 
@@ -12,7 +12,7 @@ Instead of browsing, searching, or manually managing a playlist, Deepen remember
 
 ## MVP Goal
 
-The first version of Deepen is focused on the public YouTube teaching archive of **Dr. Paul Gitwaza**.
+Deepen began with the public YouTube channel of **Dr. Paul Gitwaza** and now supports multiple selectable YouTube channels.
 
 The journey is fixed:
 
@@ -135,7 +135,7 @@ The first version intentionally does **not** include:
 - cloud synchronization
 - mobile or web companion apps
 - notes or journaling
-- multiple teaching archives
+- multiple channel archives
 - recommendations
 - social features
 - comments
@@ -146,7 +146,7 @@ The first version intentionally does **not** include:
 
 The MVP should remain focused on one job:
 
-> **Watch a teaching archive from the beginning and continue until you catch up to the latest message.**
+> **Start a channel from the beginning and continue until you catch up to the latest video.**
 
 ## YouTube Content
 
