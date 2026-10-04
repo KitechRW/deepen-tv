@@ -125,7 +125,7 @@ internal fun ChannelSearchScreen(
             Spacer(modifier = Modifier.height(22.dp))
 
             Text(
-                text = "Find a YouTube teaching channel",
+                text = "Find a YouTube channel",
                 color = Color.White,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -357,7 +357,7 @@ private fun SearchTextField(
             factory = { viewContext ->
                 EditText(viewContext).apply {
                     setSingleLine(true)
-                    hint = "Search preacher, ministry or YouTube channel"
+                    hint = "Search name, ministry or YouTube channel"
                     setTextColor(android.graphics.Color.WHITE)
                     setHintTextColor(android.graphics.Color.rgb(168, 180, 194))
                     textSize = 16f

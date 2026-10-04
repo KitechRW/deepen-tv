@@ -200,7 +200,7 @@ private fun DeepenApp() {
                 store.stats(channel.id).total
             }
             if (channelTotal == 0) {
-                errorMessage = "Add YOUTUBE_API_KEY to build Deepen and load the teaching archive."
+                errorMessage = "Add YOUTUBE_API_KEY to build Deepen and load the channel archive."
             }
             return
         }
@@ -767,7 +767,7 @@ private fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Sync to check for new teachings.",
+                        text = "Sync to check for new videos.",
                         color = DeepenMuted,
                         fontSize = 17.sp,
                     )
@@ -791,7 +791,7 @@ private fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Sync the teaching archive to begin.",
+                        text = "Sync this channel to begin.",
                         color = DeepenMuted,
                         fontSize = 17.sp,
                     )
@@ -1663,7 +1663,7 @@ private fun PlayerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "GO TO PREVIOUS TEACHING?",
+                    text = "GO TO PREVIOUS VIDEO?",
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
