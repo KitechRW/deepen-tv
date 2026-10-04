@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
@@ -114,6 +117,11 @@ class MainActivity : ComponentActivity() {
         playerProgressSaveHandler?.invoke()
         super.onPause()
     }
+}
+
+private enum class PlayerMode {
+    VIDEO,
+    LISTEN,
 }
 
 private data class InitialChannelState(
@@ -1125,9 +1133,20 @@ private fun PlayerScreen(
     var previousArmPulse by remember(video.videoId) {
         mutableStateOf(0)
     }
+    var playerMode by remember {
+        mutableStateOf(PlayerMode.VIDEO)
+    }
 
-    LaunchedEffect(playbackState, controlPulse, controlsForcedHidden) {
-        if (controlsForcedHidden) {
+    LaunchedEffect(
+        playbackState,
+        controlPulse,
+        controlsForcedHidden,
+        playerMode,
+    ) {
+        if (playerMode == PlayerMode.LISTEN) {
+            controlsForcedHidden = false
+            overlayVisible = true
+        } else if (controlsForcedHidden) {
             overlayVisible = false
         } else if (playbackState == "PLAYING") {
             delay(5000)
@@ -1193,14 +1212,58 @@ private fun PlayerScreen(
         0f
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(
+                if (playerMode == PlayerMode.LISTEN) {
+                    DeepenBackground
+                } else {
+                    Color.Black
+                },
+            ),
     ) {
+        val density = LocalDensity.current
+        val minimumVideoWidth = with(density) { 480f.toDp() }
+        val listenVideoWidth = maxOf(
+            maxWidth * 0.26f,
+            minimumVideoWidth,
+        )
+
+        if (playerMode == PlayerMode.LISTEN) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFF020711),
+                                Color(0xFF061127),
+                                Color(0xFF081421),
+                            ),
+                        ),
+                    ),
+            )
+        }
+
         key(video.videoId) {
             YouTubePlayer(
                 video = video,
+                modifier = if (playerMode == PlayerMode.LISTEN) {
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 88.dp, end = 28.dp)
+                        .width(listenVideoWidth)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                } else {
+                    Modifier.fillMaxSize()
+                },
                 onProgress = { _, position, duration ->
                     playbackPosition = position
                     if (duration > 0.0) {
@@ -1242,7 +1305,24 @@ private fun PlayerScreen(
                 onControl = { action ->
                     controlPulse += 1
 
-                    if (!overlayVisible) {
+                    if (action == "MODE") {
+                        playerMode = if (playerMode == PlayerMode.VIDEO) {
+                            PlayerMode.LISTEN
+                        } else {
+                            PlayerMode.VIDEO
+                        }
+                        controlsForcedHidden = false
+                        overlayVisible = true
+                        previousArmed = false
+                        skipArmed = false
+                        pendingSeekSeconds = 0
+                        controlFeedback = if (playerMode == PlayerMode.LISTEN) {
+                            "LISTEN MODE"
+                        } else {
+                            "VIDEO MODE"
+                        }
+                        true
+                    } else if (!overlayVisible) {
                         controlsForcedHidden = false
                         overlayVisible = true
                         previousArmed = false
@@ -1342,6 +1422,73 @@ private fun PlayerScreen(
                     onEnded(videoId)
                 },
             )
+        }
+
+        if (playerMode == PlayerMode.LISTEN) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth(0.64f)
+                    .padding(
+                        start = 46.dp,
+                        end = 28.dp,
+                        top = 70.dp,
+                        bottom = 150.dp,
+                    ),
+            ) {
+                Text(
+                    text = "LISTEN",
+                    color = DeepenBlue,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = video.title,
+                    color = Color.White,
+                    fontSize = 30.sp,
+                    lineHeight = 37.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = channel.sourceName,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = publishedMonthDayLabel(video.publishedAt),
+                    color = DeepenMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = if (playbackState == "PLAYING") {
+                        "Listening now"
+                    } else if (playbackState == "PAUSED") {
+                        "Paused"
+                    } else {
+                        "Preparing…"
+                    },
+                    color = DeepenMuted,
+                    fontSize = 13.sp,
+                )
+            }
         }
 
         if (overlayVisible) {
@@ -1718,21 +1865,125 @@ private fun PlayerScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    PlayerControlChip(
-                        "OK",
-                        if (playbackState == "PLAYING") "Pause" else "Play",
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlayerControlChip(
+                            "OK",
+                            if (playbackState == "PLAYING") "Pause" else "Play",
+                        )
+                        PlayerControlChip("←", "10s")
+                        PlayerControlChip("→", "30s")
+                        PlayerControlChip("↑", "Previous")
+                        PlayerControlChip("↓", "Skip")
+                        PlayerControlChip("BACK", "Journey")
+                        PlayerControlChip("MENU", "Mode")
+                    }
+
+                    PlayerModeSwitch(
+                        mode = playerMode,
+                        onToggle = {
+                            playerMode = if (playerMode == PlayerMode.VIDEO) {
+                                PlayerMode.LISTEN
+                            } else {
+                                PlayerMode.VIDEO
+                            }
+                            controlsForcedHidden = false
+                            overlayVisible = true
+                            controlFeedback = if (playerMode == PlayerMode.LISTEN) {
+                                "LISTEN MODE"
+                            } else {
+                                "VIDEO MODE"
+                            }
+                            controlPulse += 1
+                        },
                     )
-                    PlayerControlChip("←", "10s")
-                    PlayerControlChip("→", "30s")
-                    PlayerControlChip("↑", "Previous")
-                    PlayerControlChip("↓", "Skip")
-                    PlayerControlChip("BACK", "Journey")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerModeSwitch(
+    mode: PlayerMode,
+    onToggle: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(50)
+
+    Button(
+        onClick = onToggle,
+        modifier = Modifier
+            .onFocusChanged { focused = it.isFocused }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) {
+                    Color(0xFFBDEBFF)
+                } else {
+                    Color.White.copy(alpha = 0.14f)
+                },
+                shape = shape,
+            ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        scale = ButtonDefaults.scale(
+            scale = 1f,
+            focusedScale = 1.04f,
+            pressedScale = 0.98f,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF111A26),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF153354),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF102844),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(
+            horizontal = 12.dp,
+            vertical = 6.dp,
+        ),
+    ) {
+        Text(
+            text = "VIDEO",
+            color = if (mode == PlayerMode.VIDEO) {
+                DeepenBlue
+            } else {
+                DeepenMuted
+            },
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(16.dp)
+                .background(Color.White.copy(alpha = 0.16f)),
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text(
+            text = "LISTEN",
+            color = if (mode == PlayerMode.LISTEN) {
+                DeepenBlue
+            } else {
+                DeepenMuted
+            },
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -1773,6 +2024,7 @@ private fun PlayerControlChip(
 @Composable
 private fun YouTubePlayer(
     video: VideoItem,
+    modifier: Modifier = Modifier,
     onProgress: (String, Double, Double) -> Unit,
     onBufferTelemetry: (Double, Double, Double) -> Unit,
     onPlaybackState: (String) -> Unit,
@@ -1806,6 +2058,11 @@ private fun YouTubePlayer(
 
                 AndroidKeyEvent.KEYCODE_DPAD_DOWN,
                 AndroidKeyEvent.KEYCODE_MEDIA_NEXT -> "SKIP"
+
+                AndroidKeyEvent.KEYCODE_MENU,
+                AndroidKeyEvent.KEYCODE_SETTINGS,
+                AndroidKeyEvent.KEYCODE_INFO,
+                AndroidKeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> "MODE"
 
                 else -> null
             }
@@ -1844,7 +2101,7 @@ private fun YouTubePlayer(
     }
 
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         factory = { context ->
             WebView(context).apply {
                 settings.javaScriptEnabled = true
