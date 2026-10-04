@@ -186,6 +186,30 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    fun removeUserChannel(channelId: String): Boolean {
+        writableDatabase.beginTransaction()
+        return try {
+            val deleted = writableDatabase.delete(
+                "channels",
+                "id = ? AND user_added = 1",
+                arrayOf(channelId),
+            )
+
+            if (deleted > 0) {
+                writableDatabase.delete(
+                    "videos",
+                    "channel_id = ?",
+                    arrayOf(channelId),
+                )
+            }
+
+            writableDatabase.setTransactionSuccessful()
+            deleted > 0
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
     fun updateChannelIdentity(
         channelId: String,
         youtubeChannelId: String,
