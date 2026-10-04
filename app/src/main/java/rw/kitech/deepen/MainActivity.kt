@@ -1211,7 +1211,7 @@ private fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(playbackState, video.videoId, durationSeconds) {
+    LaunchedEffect(playbackState, video.videoId) {
         while (playbackState == "PLAYING") {
             delay(1000)
             playbackPosition = if (durationSeconds > 0.0) {
@@ -1426,7 +1426,18 @@ private fun PlayerScreen(
                             registerDirectionalContext()
                         }
 
-                        false
+                        val playbackAction =
+                            action == "CONFIRM" ||
+                            action == "TOGGLE" ||
+                            action == "PLAY" ||
+                            action == "PAUSE"
+
+                        if (playbackAction) {
+                            centerPlaybackControlVisible = true
+                            centerPlaybackControlPulse += 1
+                        }
+
+                        playbackAction
                     } else if (action == "CONFIRM" && modeContextActive) {
                         switchPlayerMode()
                         false
@@ -1500,9 +1511,6 @@ private fun PlayerScreen(
 
                                 "CONFIRM",
                                 "TOGGLE" -> {
-                                    if (playbackState == "PLAYING") {
-                                        playbackState = "PAUSED"
-                                    }
                                     centerPlaybackControlVisible = true
                                     centerPlaybackControlPulse += 1
                                     skipArmed = false
@@ -1519,7 +1527,6 @@ private fun PlayerScreen(
                                 }
 
                                 "PAUSE" -> {
-                                    playbackState = "PAUSED"
                                     centerPlaybackControlVisible = true
                                     centerPlaybackControlPulse += 1
                                     skipArmed = false
@@ -2379,7 +2386,6 @@ private fun youtubePlayerHtml(
             <script src="https://www.youtube.com/iframe_api"></script>
             <script>
                 var player;
-                var progressTimer;
                 var pendingSeekDelta = 0;
                 var pendingSeekBase = null;
                 var seekCommitTimer = null;
@@ -2429,7 +2435,6 @@ private fun youtubePlayerHtml(
                     event.target.playVideo();
 
                     reportProgress();
-                    progressTimer = setInterval(reportProgress, 5000);
                 }
 
                 function reportProgress() {
@@ -2475,9 +2480,6 @@ private fun youtubePlayerHtml(
                     if (event.data === YT.PlayerState.ENDED) {
                         reportProgress();
                         reportPlaybackState('ENDED');
-                        if (progressTimer) {
-                            clearInterval(progressTimer);
-                        }
                         AndroidBridge.onEnded();
                     }
                 }
