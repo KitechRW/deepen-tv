@@ -409,8 +409,16 @@ private fun ChannelCard(
                 )
 
                 Text(
-                    text = if (isDefault) "★" else "☆",
-                    color = if (isDefault) ChannelSettingsBlue else ChannelSettingsMuted,
+                    text = when {
+                        isDefault -> "★"
+                        selected -> "●"
+                        else -> "○"
+                    },
+                    color = if (isDefault || selected) {
+                        ChannelSettingsBlue
+                    } else {
+                        ChannelSettingsMuted
+                    },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                 )
