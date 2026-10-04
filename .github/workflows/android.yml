@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: deepen-android-${{ github.ref }}
@@ -35,6 +35,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.0"
+
+      - name: Resolve release version
+        if: github.event_name != 'pull_request'
+        run: |
+          set -a
+          source version.properties
+          set +a
+
+          NEXT_VERSION_CODE=$((VERSION_CODE + 1))
+          VERSION_PREFIX="${VERSION_NAME%.*}"
+          NEXT_VERSION_NAME="${VERSION_PREFIX}.${NEXT_VERSION_CODE}"
+
+          echo "VERSION_CODE=${NEXT_VERSION_CODE}" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${NEXT_VERSION_NAME}" >> "$GITHUB_ENV"
+
+          echo "Release version: ${NEXT_VERSION_NAME} (${NEXT_VERSION_CODE})"
 
       - name: Build debug APK
         if: github.event_name == 'pull_request'
@@ -70,10 +86,6 @@ jobs:
           DEEPEN_KEY_ALIAS: ${{ secrets.DEEPEN_KEY_ALIAS }}
           DEEPEN_KEY_PASSWORD: ${{ secrets.DEEPEN_KEY_PASSWORD }}
         run: |
-          set -a
-          source version.properties
-          set +a
-
           gradle :app:assembleRelease \
             -PYOUTUBE_API_KEY="$YOUTUBE_API_KEY" \
             -PDEEPEN_KEYSTORE_PATH="$RUNNER_TEMP/deepen-release.jks" \
@@ -87,10 +99,6 @@ jobs:
         if: github.event_name != 'pull_request'
         id: release
         run: |
-          set -a
-          source version.properties
-          set +a
-
           mkdir -p artifacts
           APK_NAME="Deepen-${VERSION_NAME}.apk"
           APK_PATH="artifacts/${APK_NAME}"
@@ -175,3 +183,19 @@ jobs:
             "${REMOTE_NAME}:" \
             --drive-root-folder-id "$GDRIVE_APKS_FOLDER_ID" \
             --include "Deepen-*"
+
+      - name: Persist release version
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          printf 'VERSION_CODE=%s\nVERSION_NAME=%s\n' "$VERSION_CODE" "$VERSION_NAME" > version.properties
+
+          if git diff --quiet -- version.properties; then
+            echo "version.properties already records $VERSION_NAME"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "Bump Android version to $VERSION_NAME [skip ci]"
+          git push origin HEAD:main
