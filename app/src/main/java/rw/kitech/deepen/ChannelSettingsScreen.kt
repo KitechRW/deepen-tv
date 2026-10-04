@@ -183,8 +183,8 @@ internal fun ChannelSettingsScreen(
 
 @Composable
 private fun SettingsAtmosphere() {
-    AsyncImage(
-        model = R.drawable.deepen_channels_background,
+    Image(
+        painter = painterResource(R.drawable.deepen_channels_background),
         contentDescription = null,
         modifier = Modifier.fillMaxSize(),
         contentScale = ContentScale.FillBounds,
