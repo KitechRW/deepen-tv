@@ -74,6 +74,7 @@ internal fun ChannelSearchScreen(
     onChooseResult: (ChannelSearchResult) -> Unit,
     onBack: () -> Unit,
 ) {
+    var inputText by remember { mutableStateOf(query) }
     var voiceAlternatives by remember { mutableStateOf<List<String>>(emptyList()) }
     var voiceError by remember { mutableStateOf<String?>(null) }
     val voiceFocusRequester = remember { FocusRequester() }
@@ -96,9 +97,11 @@ internal fun ChannelSearchScreen(
                 voiceAlternatives = emptyList()
                 voiceError = "Didn't catch that. Try again or type instead."
             } else {
+                val spokenText = alternatives.first()
                 voiceAlternatives = alternatives
                 voiceError = null
-                onQueryChange(alternatives.first())
+                inputText = spokenText
+                onQueryChange(spokenText)
             }
         }
     }
@@ -130,6 +133,12 @@ internal fun ChannelSearchScreen(
     fun focusTyping() {
         textFocusRequester.requestFocus()
         keyboardController?.show()
+    }
+
+    LaunchedEffect(query) {
+        if (query != inputText) {
+            inputText = query
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -177,50 +186,29 @@ internal fun ChannelSearchScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SearchActionButton(
-                    label = "🎙  VOICE SEARCH",
-                    onClick = ::startVoiceSearch,
-                    emphasized = true,
-                    modifier = Modifier.focusRequester(voiceFocusRequester),
-                )
-
-                SearchActionButton(
-                    label = "⌨  TYPE SEARCH",
-                    onClick = ::focusTyping,
-                )
-
-                SearchActionButton(
-                    label = "CLEAR",
-                    onClick = {
+                SearchTextField(
+                    value = inputText,
+                    onValueChange = { value ->
+                        inputText = value
+                        voiceAlternatives = emptyList()
+                        voiceError = null
+                        onQueryChange(value)
+                    },
+                    onVoiceClick = ::startVoiceSearch,
+                    onClear = {
+                        inputText = ""
                         voiceAlternatives = emptyList()
                         voiceError = null
                         keyboardController?.hide()
                         onClear()
                     },
-                    enabled = query.isNotBlank() || results.isNotEmpty() || voiceAlternatives.isNotEmpty(),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SearchTextField(
-                    value = query,
-                    onValueChange = { value ->
-                        voiceAlternatives = emptyList()
-                        voiceError = null
-                        onQueryChange(value)
-                    },
                     onSearch = onSearch,
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(textFocusRequester),
+                    voiceFocusRequester = voiceFocusRequester,
+                    textFocusRequester = textFocusRequester,
+                    modifier = Modifier.weight(1f),
                 )
 
                 Spacer(modifier = Modifier.width(10.dp))
@@ -228,7 +216,7 @@ internal fun ChannelSearchScreen(
                 SearchActionButton(
                     label = if (searching) "SEARCHING…" else "SEARCH",
                     onClick = onSearch,
-                    enabled = query.isNotBlank() && !searching,
+                    enabled = inputText.isNotBlank() && !searching,
                     emphasized = true,
                 )
             }
@@ -261,9 +249,10 @@ internal fun ChannelSearchScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 VoiceReviewPanel(
-                    query = query,
+                    query = inputText,
                     alternatives = voiceAlternatives,
                     onChooseAlternative = { alternative ->
+                        inputText = alternative
                         onQueryChange(alternative)
                     },
                     onSearch = onSearch,
@@ -513,56 +502,188 @@ private fun VoiceReviewPanel(
 private fun SearchTextField(
     value: String,
     onValueChange: (String) -> Unit,
+    onVoiceClick: () -> Unit,
+    onClear: () -> Unit,
     onSearch: () -> Unit,
+    voiceFocusRequester: FocusRequester,
+    textFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    var textFocused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(16.dp)
+
+    Row(
+        modifier = modifier
+            .height(58.dp)
+            .background(
+                color = Color(0xFF081321).copy(alpha = 0.96f),
+                shape = shape,
+            )
+            .border(
+                width = if (textFocused) 2.dp else 1.dp,
+                color = if (textFocused) {
+                    Color(0xFFBDEBFF)
+                } else {
+                    Color.White.copy(alpha = 0.12f)
+                },
+                shape = shape,
+            )
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchInputIconButton(
+            drawableRes = R.drawable.ic_mic_search,
+            contentDescription = "Voice search",
+            onClick = onVoiceClick,
+            modifier = Modifier.focusRequester(voiceFocusRequester),
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (value.isBlank()) {
+                Text(
+                    text = "Search preacher, ministry or YouTube channel",
+                    color = SearchMuted,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(textFocusRequester)
+                    .onFocusChanged { textFocused = it.isFocused },
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = { onSearch() },
+                ),
+            )
+        }
+
+        if (value.isNotBlank()) {
+            Spacer(modifier = Modifier.width(8.dp))
+
+            SearchClearButton(
+                onClick = onClear,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchInputIconButton(
+    drawableRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = CircleShape
 
-    Box(
+    Button(
+        onClick = onClick,
         modifier = modifier
-            .height(54.dp)
-            .background(
-                color = Color(0xFF081321).copy(alpha = 0.94f),
-                shape = shape,
-            )
+            .size(42.dp)
+            .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) {
                     Color(0xFFBDEBFF)
                 } else {
-                    Color.White.copy(alpha = 0.11f)
+                    SearchBlue.copy(alpha = 0.28f)
                 },
                 shape = shape,
-            )
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.CenterStart,
+            ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        scale = ButtonDefaults.scale(
+            scale = 1f,
+            focusedScale = 1.08f,
+            pressedScale = 0.96f,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF103357).copy(alpha = 0.90f),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF1B6EB4),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF0E355C),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(0.dp),
     ) {
-        if (value.isBlank()) {
-            Text(
-                text = "Say or type a preacher, ministry or YouTube channel",
-                color = SearchMuted,
-                fontSize = 14.sp,
-            )
-        }
+        Image(
+            painter = painterResource(drawableRes),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(21.dp),
+        )
+    }
+}
 
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { focused = it.isFocused },
-            singleLine = true,
-            textStyle = TextStyle(
-                color = Color.White,
-                fontSize = 16.sp,
+@Composable
+private fun SearchClearButton(
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = CircleShape
+
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .size(38.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) {
+                    Color(0xFFBDEBFF)
+                } else {
+                    Color.White.copy(alpha = 0.08f)
+                },
+                shape = shape,
             ),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Search,
-            ),
-            keyboardActions = KeyboardActions(
-                onSearch = { onSearch() },
-            ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        scale = ButtonDefaults.scale(
+            scale = 1f,
+            focusedScale = 1.08f,
+            pressedScale = 0.96f,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF101A28),
+            contentColor = SearchMuted,
+            focusedContainerColor = Color(0xFF17466F),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF0E355C),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Text(
+            text = "×",
+            color = if (focused) Color.White else SearchMuted,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Medium,
         )
     }
 }
@@ -715,13 +836,13 @@ private fun EmptySearchState() {
 
         Column {
             Text(
-                text = "Voice search is ready",
+                text = "Use the microphone in the search field",
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Or choose Type Search at any time.",
+                text = "Recognized speech appears directly in the input so you can correct it before searching.",
                 color = SearchMuted,
                 fontSize = 12.sp,
             )
