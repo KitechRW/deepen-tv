@@ -68,6 +68,7 @@ internal fun ChannelSettingsScreen(
     onSelectChannel: (ChannelSource) -> Unit,
     onAddSearchResult: (ChannelSearchResult) -> Unit,
     onSetDefault: (ChannelSource) -> Unit,
+    onRemoveUserChannel: (ChannelSource) -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -155,6 +156,7 @@ internal fun ChannelSettingsScreen(
                     selectedChannelId = selectedChannel.id,
                     defaultChannelId = defaultChannel.id,
                     onSelect = onSelectChannel,
+                    onRemove = onRemoveUserChannel,
                 )
             }
         }
@@ -163,31 +165,23 @@ internal fun ChannelSettingsScreen(
 
 @Composable
 private fun SettingsAtmosphere() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF020711),
-                        Color(0xFF061127),
-                        Color(0xFF0A1835),
-                        Color(0xFF061020),
-                    ),
-                ),
-            ),
+    Image(
+        painter = painterResource(R.drawable.deepen_channels_background),
+        contentDescription = null,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.FillBounds,
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.radialGradient(
+                Brush.horizontalGradient(
                     colors = listOf(
-                        ChannelSettingsBlue.copy(alpha = 0.20f),
+                        Color(0xFF020711).copy(alpha = 0.88f),
+                        Color(0xFF061127).copy(alpha = 0.58f),
                         Color.Transparent,
                     ),
-                    radius = 1050f,
                 ),
             ),
     )
@@ -198,9 +192,9 @@ private fun SettingsAtmosphere() {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
+                        Color(0xFF020711).copy(alpha = 0.18f),
                         Color.Transparent,
-                        Color(0xFF020711).copy(alpha = 0.15f),
-                        Color(0xFF020711).copy(alpha = 0.62f),
+                        Color(0xFF020711).copy(alpha = 0.60f),
                     ),
                 ),
             ),
@@ -325,7 +319,7 @@ private fun SelectedChannelPanel(
                 modifier = Modifier.weight(1f),
             ) {
                 Text(
-                    text = "SELECTED CHANNEL",
+                    text = if (isDefault) "DEFAULT CHANNEL" else "SELECTED CHANNEL",
                     color = ChannelSettingsBlue.copy(alpha = 0.90f),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -346,7 +340,7 @@ private fun SelectedChannelPanel(
                 Spacer(modifier = Modifier.height(3.dp))
 
                 Text(
-                    text = channel.secondaryLabel,
+                    text = if (channel.featured) channel.sourceName else channel.secondaryLabel,
                     color = ChannelSettingsMuted,
                     fontSize = 13.sp,
                     maxLines = 1,
@@ -376,13 +370,12 @@ private fun FeaturedChannelRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         channels.take(5).forEach { channel ->
-            ChannelCard(
+            FeaturedChannelCard(
                 channel = channel,
                 selected = channel.id == selectedChannelId,
                 isDefault = channel.id == defaultChannelId,
                 onClick = { onSelect(channel) },
                 modifier = Modifier.weight(1f),
-                compact = false,
             )
         }
     }
@@ -394,6 +387,7 @@ private fun PersonalChannelRow(
     selectedChannelId: String,
     defaultChannelId: String,
     onSelect: (ChannelSource) -> Unit,
+    onRemove: (ChannelSource) -> Unit,
 ) {
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -403,44 +397,43 @@ private fun PersonalChannelRow(
             items = channels,
             key = { channel -> channel.id },
         ) { channel ->
-            ChannelCard(
+            PersonalChannelCard(
                 channel = channel,
                 selected = channel.id == selectedChannelId,
                 isDefault = channel.id == defaultChannelId,
-                onClick = { onSelect(channel) },
-                modifier = Modifier.width(230.dp),
-                compact = true,
+                onSelect = { onSelect(channel) },
+                onRemove = { onRemove(channel) },
             )
         }
     }
 }
 
 @Composable
-private fun ChannelCard(
+private fun FeaturedChannelCard(
     channel: ChannelSource,
     selected: Boolean,
     isDefault: Boolean,
     onClick: () -> Unit,
     modifier: Modifier,
-    compact: Boolean,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(15.dp)
+    val temporarySelection = selected && !isDefault
 
     Button(
         onClick = onClick,
         modifier = modifier
-            .height(if (compact) 104.dp else 122.dp)
+            .height(122.dp)
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = when {
                     focused -> 2.dp
-                    selected -> 1.5.dp
+                    temporarySelection -> 1.5.dp
                     else -> 1.dp
                 },
                 color = when {
                     focused -> Color(0xFFBDEBFF)
-                    selected -> ChannelSettingsBlue.copy(alpha = 0.95f)
+                    temporarySelection -> ChannelSettingsBlue.copy(alpha = 0.95f)
                     else -> Color.White.copy(alpha = 0.055f)
                 },
                 shape = shape,
@@ -464,8 +457,8 @@ private fun ChannelCard(
             pressedContentColor = Color.White,
         ),
         contentPadding = PaddingValues(
-            horizontal = if (compact) 13.dp else 14.dp,
-            vertical = if (compact) 11.dp else 13.dp,
+            horizontal = 14.dp,
+            vertical = 13.dp,
         ),
     ) {
         Column(
@@ -479,38 +472,205 @@ private fun ChannelCard(
                 ChannelAvatar(
                     imageUrl = channel.thumbnailUrl,
                     contentDescription = channel.displayName,
-                    size = if (compact) 34 else 42,
+                    size = 42,
                     ring = false,
                 )
 
                 ChannelStateIcon(
-                    selected = selected,
+                    selected = temporarySelection,
                     isDefault = isDefault,
                 )
             }
 
-            Spacer(modifier = Modifier.height(if (compact) 7.dp else 9.dp))
+            Spacer(modifier = Modifier.height(9.dp))
 
             Text(
                 text = channel.displayName,
                 color = Color.White,
-                fontSize = if (compact) 13.sp else 14.sp,
-                lineHeight = if (compact) 16.sp else 17.sp,
+                fontSize = 14.sp,
+                lineHeight = 17.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(3.dp))
+@Composable
+private fun PersonalChannelCard(
+    channel: ChannelSource,
+    selected: Boolean,
+    isDefault: Boolean,
+    onSelect: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    var selectFocused by remember { mutableStateOf(false) }
+    var removeFocused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(15.dp)
+    val temporarySelection = selected && !isDefault
 
+    Column(
+        modifier = Modifier
+            .width(230.dp)
+            .height(144.dp)
+            .background(
+                color = ChannelSettingsPanel.copy(alpha = 0.88f),
+                shape = shape,
+            )
+            .border(
+                width = when {
+                    selectFocused || removeFocused -> 2.dp
+                    temporarySelection -> 1.5.dp
+                    else -> 1.dp
+                },
+                color = when {
+                    selectFocused || removeFocused -> Color(0xFFBDEBFF)
+                    temporarySelection -> ChannelSettingsBlue.copy(alpha = 0.95f)
+                    else -> Color.White.copy(alpha = 0.055f)
+                },
+                shape = shape,
+            ),
+    ) {
+        Button(
+            onClick = onSelect,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(104.dp)
+                .onFocusChanged { selectFocused = it.isFocused },
+            shape = ButtonDefaults.shape(
+                shape = shape,
+                focusedShape = shape,
+                pressedShape = shape,
+            ),
+            scale = ButtonDefaults.scale(
+                scale = 1.0f,
+                focusedScale = 1.02f,
+                pressedScale = 0.985f,
+            ),
+            colors = ButtonDefaults.colors(
+                containerColor = Color.Transparent,
+                contentColor = Color.White,
+                focusedContainerColor = Color(0xFF153354).copy(alpha = 0.78f),
+                focusedContentColor = Color.White,
+                pressedContainerColor = Color(0xFF102844).copy(alpha = 0.82f),
+                pressedContentColor = Color.White,
+            ),
+            contentPadding = PaddingValues(
+                horizontal = 13.dp,
+                vertical = 11.dp,
+            ),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    ChannelAvatar(
+                        imageUrl = channel.thumbnailUrl,
+                        contentDescription = channel.displayName,
+                        size = 38,
+                        ring = false,
+                    )
+
+                    ChannelStateIcon(
+                        selected = temporarySelection,
+                        isDefault = isDefault,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(7.dp))
+
+                Text(
+                    text = channel.displayName,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .padding(start = 13.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 text = channel.secondaryLabel,
-                color = ChannelSettingsMuted.copy(alpha = 0.88f),
+                modifier = Modifier.weight(1f),
+                color = ChannelSettingsMuted.copy(alpha = 0.90f),
                 fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            RemoveChannelButton(
+                focused = removeFocused,
+                onFocusChanged = { removeFocused = it },
+                onClick = onRemove,
+            )
         }
+    }
+}
+
+@Composable
+private fun RemoveChannelButton(
+    focused: Boolean,
+    onFocusChanged: (Boolean) -> Unit,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(50)
+
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .height(28.dp)
+            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) {
+                    Color(0xFFFFB4AB)
+                } else {
+                    Color.White.copy(alpha = 0.10f)
+                },
+                shape = shape,
+            ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        scale = ButtonDefaults.scale(
+            scale = 1.0f,
+            focusedScale = 1.05f,
+            pressedScale = 0.98f,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF0A1320).copy(alpha = 0.78f),
+            contentColor = Color(0xFFBCC7D4),
+            focusedContainerColor = Color(0xFF4A2528),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF371B1D),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+    ) {
+        Text(
+            text = "REMOVE",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
