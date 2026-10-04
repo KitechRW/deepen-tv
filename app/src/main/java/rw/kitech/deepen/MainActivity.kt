@@ -410,6 +410,32 @@ private fun DeepenApp() {
                     }
                 }
             },
+            onRemoveUserChannel = { channel ->
+                scope.launch {
+                    val removedDefault = channel.id == defaultChannel.id
+
+                    val fallback = withContext(Dispatchers.IO) {
+                        if (removedDefault) {
+                            store.setDefaultChannel(ChannelCatalog.DEFAULT_CHANNEL_ID)
+                        }
+
+                        store.removeUserChannel(channel.id)
+                        store.defaultChannel()
+                    }
+
+                    refreshChannels(selectedSettingsChannel.id)
+
+                    if (removedDefault) {
+                        defaultChannel = fallback
+                        selectedSettingsChannel = fallback
+                        refreshLocalState(fallback.id)
+
+                        if (BuildConfig.YOUTUBE_API_KEY.isNotBlank()) {
+                            syncArchive(fallback)
+                        }
+                    }
+                }
+            },
             onBack = {
                 settingsOpen = false
                 searchOpen = false
