@@ -1195,6 +1195,17 @@ private fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(playbackState, video.videoId, durationSeconds) {
+        while (playbackState == "PLAYING") {
+            delay(1000)
+            playbackPosition = if (durationSeconds > 0.0) {
+                (playbackPosition + 1.0).coerceAtMost(durationSeconds)
+            } else {
+                playbackPosition + 1.0
+            }
+        }
+    }
+
     fun persistProgress() {
         onProgress(
             video.videoId,
@@ -1248,18 +1259,11 @@ private fun PlayerScreen(
         )
 
         if (playerMode == PlayerMode.LISTEN) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0xFF020711),
-                                Color(0xFF061127),
-                                Color(0xFF081421),
-                            ),
-                        ),
-                    ),
+            Image(
+                painter = painterResource(R.drawable.deepen_listen_background),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
             )
         }
 
@@ -1269,7 +1273,7 @@ private fun PlayerScreen(
                 modifier = if (playerMode == PlayerMode.LISTEN) {
                     Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 88.dp, end = 28.dp)
+                        .padding(top = 28.dp, end = 28.dp)
                         .width(listenVideoWidth)
                         .aspectRatio(16f / 9f)
                         .clip(RoundedCornerShape(10.dp))
@@ -1282,10 +1286,14 @@ private fun PlayerScreen(
                     Modifier.fillMaxSize()
                 },
                 onProgress = { _, position, duration ->
-                    playbackPosition = position
                     if (duration > 0.0) {
                         durationSeconds = duration
                     }
+
+                    if (playbackState != "PLAYING" || playbackPosition <= 0.0) {
+                        playbackPosition = position
+                    }
+
                     if (
                         position > 0.0 &&
                         (playbackState == "LOADING" || playbackState == "READY")
@@ -1409,6 +1417,7 @@ private fun PlayerScreen(
                             when (action) {
                                 "SEEK_BACK" -> {
                                     skipArmed = false
+                                    playbackPosition = (playbackPosition - 10.0).coerceAtLeast(0.0)
                                     pendingSeekSeconds -= 10
                                     controlFeedback = if (pendingSeekSeconds < 0) {
                                         "↶  " + abs(pendingSeekSeconds) + " SEC"
@@ -1419,6 +1428,11 @@ private fun PlayerScreen(
 
                                 "SEEK_FORWARD" -> {
                                     skipArmed = false
+                                    playbackPosition = if (durationSeconds > 0.0) {
+                                        (playbackPosition + 30.0).coerceAtMost(durationSeconds)
+                                    } else {
+                                        playbackPosition + 30.0
+                                    }
                                     pendingSeekSeconds += 30
                                     controlFeedback = if (pendingSeekSeconds < 0) {
                                         "↶  " + abs(pendingSeekSeconds) + " SEC"
@@ -1477,74 +1491,8 @@ private fun PlayerScreen(
             )
         }
 
-        if (playerMode == PlayerMode.LISTEN) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth(0.64f)
-                    .padding(
-                        start = 46.dp,
-                        end = 28.dp,
-                        top = 70.dp,
-                        bottom = 150.dp,
-                    ),
-            ) {
-                Text(
-                    text = "LISTEN",
-                    color = DeepenBlue,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = video.title,
-                    color = Color.White,
-                    fontSize = 30.sp,
-                    lineHeight = 37.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = channel.sourceName,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = publishedMonthDayLabel(video.publishedAt),
-                    color = DeepenMuted,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = if (playbackState == "PLAYING") {
-                        "Listening now"
-                    } else if (playbackState == "PAUSED") {
-                        "Paused"
-                    } else {
-                        "Preparing…"
-                    },
-                    color = DeepenMuted,
-                    fontSize = 13.sp,
-                )
-            }
-        }
-
-        if (overlayVisible) {
+        if (overlayVisible && playerMode == PlayerMode.VIDEO) {
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1615,7 +1563,7 @@ private fun PlayerScreen(
                         .background(DeepenBlue),
                 )
             }
-        } else {
+        } else if (playerMode == PlayerMode.VIDEO) {
             Image(
                 painter = painterResource(R.drawable.deepen_icon),
                 contentDescription = "Deepen",
@@ -2373,11 +2321,11 @@ private fun youtubePlayerHtml(
                         if (poster) poster.style.display = 'none';
                         AndroidBridge.onPlaybackState('PLAYING');
                     } else if (event.data === YT.PlayerState.PAUSED) {
-                        reportProgress();
                         AndroidBridge.onPlaybackState('PAUSED');
-                    } else if (event.data === YT.PlayerState.BUFFERING) {
                         reportProgress();
+                    } else if (event.data === YT.PlayerState.BUFFERING) {
                         AndroidBridge.onPlaybackState('BUFFERING');
+                        reportProgress();
                     } else if (event.data === YT.PlayerState.CUED) {
                         AndroidBridge.onPlaybackState('READY');
                     }
@@ -2435,6 +2383,7 @@ private fun youtubePlayerHtml(
                     }
 
                     player.seekTo(target, true);
+                    setTimeout(reportProgress, 150);
                     pendingSeekDelta = 0;
                     pendingSeekBase = null;
                     seekCommitTimer = null;
