@@ -706,7 +706,7 @@ private fun DeleteConfirmButton(
 
     Button(
         onClick = onClick,
-        modifier = modifier
+        modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
@@ -1110,7 +1110,7 @@ private fun SettingsPillButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier
+        modifier = modifier
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
