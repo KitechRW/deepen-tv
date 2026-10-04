@@ -591,7 +591,7 @@ private fun HomeScreen(
                     ) {
                         HomeChannelAvatar(
                             imageUrl = activeChannel.thumbnailUrl,
-                            contentDescription = activeChannel.displayName,
+                            contentDescription = activeChannel.sourceName,
                         )
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -664,7 +664,7 @@ private fun HomeScreen(
 
                             Column {
                                 Text(
-                                    text = activeChannel.displayName,
+                                    text = activeChannel.sourceName,
                                     color = Color.White,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
