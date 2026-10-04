@@ -290,6 +290,7 @@ private fun DeepenApp() {
     if (activePlayerVideo != null) {
         PlayerScreen(
             video = activePlayerVideo,
+            channel = defaultChannel,
             onProgress = { videoId, position, duration ->
                 scope.launch(Dispatchers.IO) {
                     store.saveProgress(videoId, position, duration)
@@ -1045,6 +1046,7 @@ private fun DeepenSyncButton(
 @Composable
 private fun PlayerScreen(
     video: VideoItem,
+    channel: ChannelSource,
     onProgress: (String, Double, Double) -> Unit,
     onEnded: (String) -> Unit,
     onSkip: (String) -> Unit,
@@ -1359,21 +1361,34 @@ private fun PlayerScreen(
                         }
                     }
 
-                    Column(
-                        horizontalAlignment = Alignment.End,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = "Dr. Paul Gitwaza",
-                            color = DeepenMuted,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
+                        HomeChannelAvatar(
+                            imageUrl = channel.thumbnailUrl,
+                            contentDescription = channel.sourceName,
                         )
-                        Text(
-                            text = publishedMonthDayLabel(video.publishedAt),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                        ) {
+                            Text(
+                                text = channel.sourceName,
+                                color = DeepenMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = publishedMonthDayLabel(video.publishedAt),
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
 
