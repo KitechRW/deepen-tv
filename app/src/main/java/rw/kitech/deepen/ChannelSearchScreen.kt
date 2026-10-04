@@ -29,8 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -71,7 +69,6 @@ internal fun ChannelSearchScreen(
     var inputText by remember { mutableStateOf(query) }
     var nativeInput by remember { mutableStateOf<EditText?>(null) }
     val context = LocalContext.current
-    val voiceFocusRequester = remember { FocusRequester() }
 
     fun focusNativeSearchInput() {
         nativeInput?.let { editText ->
@@ -98,8 +95,10 @@ internal fun ChannelSearchScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        voiceFocusRequester.requestFocus()
+    LaunchedEffect(nativeInput) {
+        if (nativeInput != null) {
+            focusNativeSearchInput()
+        }
     }
 
     BackHandler(onBack = onBack)
@@ -161,7 +160,6 @@ internal fun ChannelSearchScreen(
                     onNativeInputReady = { editText ->
                         nativeInput = editText
                     },
-                    voiceFocusRequester = voiceFocusRequester,
                     modifier = Modifier.weight(1f),
                 )
 
@@ -320,7 +318,6 @@ private fun SearchTextField(
     onClear: () -> Unit,
     onSearch: () -> Unit,
     onNativeInputReady: (EditText) -> Unit,
-    voiceFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     var textFocused by remember { mutableStateOf(false) }
@@ -349,7 +346,6 @@ private fun SearchTextField(
             drawableRes = R.drawable.ic_mic_search,
             contentDescription = "Use MiBox remote microphone",
             onClick = onVoiceClick,
-            modifier = Modifier.focusRequester(voiceFocusRequester),
         )
 
         Spacer(modifier = Modifier.width(8.dp))
