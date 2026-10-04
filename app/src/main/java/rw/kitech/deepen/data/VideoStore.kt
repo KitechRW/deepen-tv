@@ -5,6 +5,8 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import rw.kitech.deepen.model.ChannelSearchResult
+import rw.kitech.deepen.model.ChannelSource
 import rw.kitech.deepen.model.VideoItem
 
 data class JourneyStats(
@@ -19,25 +21,9 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
     DATABASE_VERSION,
 ) {
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL(
-            """
-            CREATE TABLE videos (
-                video_id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                published_at TEXT NOT NULL,
-                completed INTEGER NOT NULL DEFAULT 0,
-                progress_seconds REAL NOT NULL DEFAULT 0,
-                duration_seconds REAL NOT NULL DEFAULT 0
-            )
-            """.trimIndent()
-        )
-
-        db.execSQL(
-            """
-            CREATE INDEX idx_videos_journey
-            ON videos(completed, published_at, video_id)
-            """.trimIndent()
-        )
+        createChannelsTable(db)
+        createVideosTable(db)
+        seedFeaturedChannels(db)
     }
 
     override fun onUpgrade(
@@ -45,10 +31,176 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         oldVersion: Int,
         newVersion: Int,
     ) {
-        // Schema version 1 only.
+        if (oldVersion < 2) {
+            createChannelsTable(db)
+            seedFeaturedChannels(db)
+
+            db.execSQL(
+                """
+                ALTER TABLE videos
+                ADD COLUMN channel_id TEXT NOT NULL DEFAULT 'paul-gitwaza'
+                """.trimIndent()
+            )
+
+            db.execSQL("DROP INDEX IF EXISTS idx_videos_journey")
+            db.execSQL(
+                """
+                CREATE INDEX idx_videos_journey
+                ON videos(channel_id, completed, published_at, video_id)
+                """.trimIndent()
+            )
+        }
     }
 
-    fun upsertArchiveItems(items: List<VideoItem>) {
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        seedFeaturedChannels(db)
+    }
+
+    fun defaultChannel(): ChannelSource {
+        readableDatabase.rawQuery(
+            """
+            SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
+                   lookup_query, featured, featured_order, is_default, user_added
+            FROM channels
+            WHERE is_default = 1
+            ORDER BY featured_order ASC, display_name ASC
+            LIMIT 1
+            """.trimIndent(),
+            emptyArray(),
+        ).use { cursor ->
+            if (cursor.moveToFirst()) {
+                return cursor.toChannelSource()
+            }
+        }
+
+        val fallback = ChannelCatalog.featuredChannels.first()
+        setDefaultChannel(fallback.id)
+        return channel(fallback.id) ?: fallback
+    }
+
+    fun channel(channelId: String): ChannelSource? {
+        readableDatabase.rawQuery(
+            """
+            SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
+                   lookup_query, featured, featured_order, is_default, user_added
+            FROM channels
+            WHERE id = ?
+            LIMIT 1
+            """.trimIndent(),
+            arrayOf(channelId),
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toChannelSource() else null
+        }
+    }
+
+    fun featuredChannels(): List<ChannelSource> {
+        return readChannels(
+            """
+            SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
+                   lookup_query, featured, featured_order, is_default, user_added
+            FROM channels
+            WHERE featured = 1
+            ORDER BY featured_order ASC, display_name ASC
+            """.trimIndent()
+        )
+    }
+
+    fun userChannels(): List<ChannelSource> {
+        return readChannels(
+            """
+            SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
+                   lookup_query, featured, featured_order, is_default, user_added
+            FROM channels
+            WHERE user_added = 1
+            ORDER BY display_name COLLATE NOCASE ASC
+            """.trimIndent()
+        )
+    }
+
+    fun addUserChannel(result: ChannelSearchResult): ChannelSource {
+        val id = "youtube:" + result.youtubeChannelId
+        val handle = result.handle?.removePrefix("@")?.takeIf { it.isNotBlank() }
+
+        val values = ContentValues().apply {
+            put("id", id)
+            put("display_name", result.displayName)
+            put("source_name", result.displayName)
+            put("youtube_channel_id", result.youtubeChannelId)
+            handle?.let { put("youtube_handle", it) }
+            put("lookup_query", result.displayName)
+            put("featured", 0)
+            put("featured_order", 999)
+            put("is_default", 0)
+            put("user_added", 1)
+        }
+
+        writableDatabase.insertWithOnConflict(
+            "channels",
+            null,
+            values,
+            SQLiteDatabase.CONFLICT_IGNORE,
+        )
+
+        return channel(id) ?: ChannelSource(
+            id = id,
+            displayName = result.displayName,
+            sourceName = result.displayName,
+            youtubeChannelId = result.youtubeChannelId,
+            youtubeHandle = handle,
+            lookupQuery = result.displayName,
+            isUserAdded = true,
+        )
+    }
+
+    fun setDefaultChannel(channelId: String) {
+        writableDatabase.beginTransaction()
+        try {
+            writableDatabase.execSQL("UPDATE channels SET is_default = 0")
+            val values = ContentValues().apply {
+                put("is_default", 1)
+            }
+            val updated = writableDatabase.update(
+                "channels",
+                values,
+                "id = ?",
+                arrayOf(channelId),
+            )
+            if (updated == 0) {
+                error("Could not set the selected Deepen channel as default.")
+            }
+            writableDatabase.setTransactionSuccessful()
+        } finally {
+            writableDatabase.endTransaction()
+        }
+    }
+
+    fun updateChannelIdentity(
+        channelId: String,
+        youtubeChannelId: String,
+        sourceName: String,
+        handle: String?,
+    ) {
+        val values = ContentValues().apply {
+            put("youtube_channel_id", youtubeChannelId)
+            put("source_name", sourceName)
+            handle?.removePrefix("@")?.takeIf { it.isNotBlank() }?.let {
+                put("youtube_handle", it)
+            }
+        }
+
+        writableDatabase.update(
+            "channels",
+            values,
+            "id = ?",
+            arrayOf(channelId),
+        )
+    }
+
+    fun upsertArchiveItems(
+        channelId: String,
+        items: List<VideoItem>,
+    ) {
         if (items.isEmpty()) return
 
         writableDatabase.beginTransaction()
@@ -56,6 +208,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
             items.forEach { item ->
                 val values = ContentValues().apply {
                     put("video_id", item.videoId)
+                    put("channel_id", channelId)
                     put("title", item.title)
                     put("published_at", item.publishedAt)
                 }
@@ -68,6 +221,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
                 )
 
                 val metadata = ContentValues().apply {
+                    put("channel_id", channelId)
                     put("title", item.title)
                     put("published_at", item.publishedAt)
                 }
@@ -85,34 +239,50 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    fun isKnown(videoId: String): Boolean {
+    fun isKnown(
+        channelId: String,
+        videoId: String,
+    ): Boolean {
         readableDatabase.rawQuery(
-            "SELECT 1 FROM videos WHERE video_id = ? LIMIT 1",
-            arrayOf(videoId),
+            """
+            SELECT 1
+            FROM videos
+            WHERE channel_id = ? AND video_id = ?
+            LIMIT 1
+            """.trimIndent(),
+            arrayOf(channelId, videoId),
         ).use { cursor ->
             return cursor.moveToFirst()
         }
     }
 
-    fun currentVideo(): VideoItem? {
+    fun currentVideo(channelId: String): VideoItem? {
         readableDatabase.rawQuery(
             """
             SELECT video_id, title, published_at, completed, progress_seconds, duration_seconds
             FROM videos
-            WHERE completed = 0
+            WHERE channel_id = ? AND completed = 0
             ORDER BY published_at ASC, video_id ASC
             LIMIT 1
             """.trimIndent(),
-            emptyArray(),
+            arrayOf(channelId),
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toVideoItem() else null
         }
     }
 
-    fun previousVideo(videoId: String): VideoItem? {
+    fun previousVideo(
+        channelId: String,
+        videoId: String,
+    ): VideoItem? {
         val publishedAt = readableDatabase.rawQuery(
-            "SELECT published_at FROM videos WHERE video_id = ? LIMIT 1",
-            arrayOf(videoId),
+            """
+            SELECT published_at
+            FROM videos
+            WHERE channel_id = ? AND video_id = ?
+            LIMIT 1
+            """.trimIndent(),
+            arrayOf(channelId, videoId),
         ).use { cursor ->
             if (!cursor.moveToFirst()) return null
             cursor.getString(0)
@@ -122,19 +292,25 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
             """
             SELECT video_id, title, published_at, completed, progress_seconds, duration_seconds
             FROM videos
-            WHERE published_at < ?
-               OR (published_at = ? AND video_id < ?)
+            WHERE channel_id = ?
+              AND (
+                    published_at < ?
+                    OR (published_at = ? AND video_id < ?)
+              )
             ORDER BY published_at DESC, video_id DESC
             LIMIT 1
             """.trimIndent(),
-            arrayOf(publishedAt, publishedAt, videoId),
+            arrayOf(channelId, publishedAt, publishedAt, videoId),
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toVideoItem() else null
         }
     }
 
-    fun rewindToPrevious(videoId: String): VideoItem? {
-        val previous = previousVideo(videoId) ?: return null
+    fun rewindToPrevious(
+        channelId: String,
+        videoId: String,
+    ): VideoItem? {
+        val previous = previousVideo(channelId, videoId) ?: return null
 
         val values = ContentValues().apply {
             put("completed", 0)
@@ -144,8 +320,8 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         writableDatabase.update(
             "videos",
             values,
-            "video_id = ?",
-            arrayOf(previous.videoId),
+            "channel_id = ? AND video_id = ?",
+            arrayOf(channelId, previous.videoId),
         )
 
         return previous.copy(
@@ -154,15 +330,16 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         )
     }
 
-    fun stats(): JourneyStats {
+    fun stats(channelId: String): JourneyStats {
         readableDatabase.rawQuery(
             """
             SELECT
                 COALESCE(SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END), 0),
                 COUNT(*)
             FROM videos
+            WHERE channel_id = ?
             """.trimIndent(),
-            emptyArray(),
+            arrayOf(channelId),
         ).use { cursor ->
             if (!cursor.moveToFirst()) return JourneyStats(0, 0)
             return JourneyStats(
@@ -213,6 +390,125 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         )
     }
 
+    private fun createChannelsTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS channels (
+                id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                source_name TEXT NOT NULL,
+                youtube_channel_id TEXT,
+                youtube_handle TEXT,
+                lookup_query TEXT NOT NULL,
+                featured INTEGER NOT NULL DEFAULT 0,
+                featured_order INTEGER NOT NULL DEFAULT 999,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                user_added INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+    }
+
+    private fun createVideosTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE videos (
+                video_id TEXT PRIMARY KEY,
+                channel_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                progress_seconds REAL NOT NULL DEFAULT 0,
+                duration_seconds REAL NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            """
+            CREATE INDEX idx_videos_journey
+            ON videos(channel_id, completed, published_at, video_id)
+            """.trimIndent()
+        )
+    }
+
+    private fun seedFeaturedChannels(db: SQLiteDatabase) {
+        if (!db.isOpen) return
+
+        ChannelCatalog.featuredChannels.forEach { channel ->
+            val values = ContentValues().apply {
+                put("id", channel.id)
+                put("display_name", channel.displayName)
+                put("source_name", channel.sourceName)
+                channel.youtubeChannelId?.let { put("youtube_channel_id", it) }
+                channel.youtubeHandle?.let { put("youtube_handle", it.removePrefix("@")) }
+                put("lookup_query", channel.lookupQuery)
+                put("featured", 1)
+                put("featured_order", channel.featuredOrder)
+                put("is_default", if (channel.id == ChannelCatalog.DEFAULT_CHANNEL_ID) 1 else 0)
+                put("user_added", 0)
+            }
+
+            db.insertWithOnConflict(
+                "channels",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_IGNORE,
+            )
+
+            val metadata = ContentValues().apply {
+                put("display_name", channel.displayName)
+                put("lookup_query", channel.lookupQuery)
+                put("featured", 1)
+                put("featured_order", channel.featuredOrder)
+
+                if (channel.id == ChannelCatalog.DEFAULT_CHANNEL_ID) {
+                    put("youtube_handle", "drpaulmgitwaza")
+                }
+
+                if (channel.sourceName.isNotBlank()) {
+                    put("source_name", channel.sourceName)
+                }
+            }
+
+            db.update(
+                "channels",
+                metadata,
+                "id = ?",
+                arrayOf(channel.id),
+            )
+        }
+    }
+
+    private fun readChannels(query: String): List<ChannelSource> {
+        val channels = mutableListOf<ChannelSource>()
+        readableDatabase.rawQuery(query, emptyArray()).use { cursor ->
+            while (cursor.moveToNext()) {
+                channels += cursor.toChannelSource()
+            }
+        }
+        return channels
+    }
+
+    private fun Cursor.toChannelSource(): ChannelSource {
+        return ChannelSource(
+            id = getString(0),
+            displayName = getString(1),
+            sourceName = getString(2),
+            youtubeChannelId = getStringOrNull(3),
+            youtubeHandle = getStringOrNull(4),
+            lookupQuery = getString(5),
+            featured = getInt(6) == 1,
+            featuredOrder = getInt(7),
+            isDefault = getInt(8) == 1,
+            isUserAdded = getInt(9) == 1,
+        )
+    }
+
+    private fun Cursor.getStringOrNull(index: Int): String? {
+        return if (isNull(index)) null else getString(index)
+    }
+
     private fun Cursor.toVideoItem(): VideoItem {
         return VideoItem(
             videoId = getString(0),
@@ -226,7 +522,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
 
     companion object {
         private const val DATABASE_NAME = "deepen.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
         private const val COMPLETION_THRESHOLD = 0.95
     }
 }
