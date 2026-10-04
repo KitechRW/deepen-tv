@@ -1456,6 +1456,9 @@ private fun PlayerScreen(
 
                                 "CONFIRM",
                                 "TOGGLE" -> {
+                                    if (playbackState == "PLAYING") {
+                                        playbackState = "PAUSED"
+                                    }
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -1468,6 +1471,7 @@ private fun PlayerScreen(
                                 }
 
                                 "PAUSE" -> {
+                                    playbackState = "PAUSED"
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -1718,18 +1722,22 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF08111E))
+                    .background(Color(0xE60A1320))
                     .border(
-                        width = 2.dp,
-                        color = DeepenBlue,
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.78f),
                         shape = RoundedCornerShape(50),
                     )
-                    .padding(horizontal = 30.dp, vertical = 16.dp),
+                    .padding(horizontal = 26.dp, vertical = 13.dp),
             ) {
                 Text(
-                    text = "▶  PLAY",
+                    text = if (modeContextActive) {
+                        "OK  ·  SWITCH MODE"
+                    } else {
+                        "OK  ·  ▶ PLAY"
+                    },
                     color = Color.White,
-                    fontSize = 22.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -1817,20 +1825,34 @@ private fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(Color.Black)
-                    .padding(horizontal = 26.dp, vertical = 17.dp),
+                    .padding(
+                        start = 28.dp,
+                        end = 28.dp,
+                        bottom = 22.dp,
+                    )
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color(0xE60A101A))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.38f),
+                        shape = RoundedCornerShape(24.dp),
+                    )
+                    .padding(
+                        horizontal = 22.dp,
+                        vertical = 17.dp,
+                    ),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Bottom,
                 ) {
                     Text(
                         text = video.title,
                         color = Color.White,
-                        fontSize = 18.sp,
-                        lineHeight = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 19.sp,
+                        lineHeight = 23.sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth(0.72f),
@@ -1838,31 +1860,41 @@ private fun PlayerScreen(
 
                     Text(
                         text = "${formatPlaybackTime(playbackPosition)}  /  ${formatPlaybackTime(durationSeconds)}",
-                        color = Color.White,
-                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.92f),
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(13.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(Color(0xFF273242)),
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFF354152)),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(progress)
-                            .clip(RoundedCornerShape(5.dp))
+                            .clip(RoundedCornerShape(50))
                             .background(DeepenBlue),
-                    )
+                    ) {
+                        if (progress > 0.01f) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1874,14 +1906,15 @@ private fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         PlayerControlChip(
-                            "OK",
-                            if (modeContextActive) {
+                            keyLabel = "OK",
+                            actionLabel = if (modeContextActive) {
                                 "Switch mode"
                             } else if (playbackState == "PLAYING") {
                                 "Pause"
                             } else {
                                 "Play"
                             },
+                            primary = true,
                         )
                         PlayerControlChip("←", "10s")
                         PlayerControlChip("→", "30s")
@@ -1994,31 +2027,64 @@ private fun PlayerModeContextChip(
 private fun PlayerControlChip(
     keyLabel: String,
     actionLabel: String,
+    primary: Boolean = false,
 ) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color(0xFF111A26))
+            .background(
+                if (primary) {
+                    DeepenBlue.copy(alpha = 0.14f)
+                } else {
+                    Color(0xC9141D29)
+                },
+            )
             .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.16f),
+                width = if (primary) 1.5.dp else 1.dp,
+                color = if (primary) {
+                    DeepenBlue
+                } else {
+                    Color.White.copy(alpha = 0.18f)
+                },
                 shape = RoundedCornerShape(50),
             )
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(
+                horizontal = if (primary) 11.dp else 10.dp,
+                vertical = 7.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = keyLabel,
-            color = DeepenBlue,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(modifier = Modifier.width(6.dp))
+        Box(
+            modifier = if (primary) {
+                Modifier
+                    .size(25.dp)
+                    .clip(CircleShape)
+                    .background(DeepenBlue.copy(alpha = 0.18f))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.90f),
+                        shape = CircleShape,
+                    )
+            } else {
+                Modifier
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = keyLabel,
+                color = if (primary) Color.White else DeepenBlue,
+                fontSize = if (primary) 10.sp else 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        Spacer(modifier = Modifier.width(if (primary) 8.dp else 6.dp))
+
         Text(
             text = actionLabel,
             color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontSize = if (primary) 11.sp else 10.sp,
+            fontWeight = if (primary) FontWeight.Bold else FontWeight.SemiBold,
         )
     }
 }
