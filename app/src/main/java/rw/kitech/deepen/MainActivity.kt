@@ -1136,6 +1136,15 @@ private fun PlayerScreen(
     var playerMode by remember {
         mutableStateOf(PlayerMode.VIDEO)
     }
+    var modeContextActive by remember(video.videoId) {
+        mutableStateOf(false)
+    }
+    var modeContextSuppressed by remember(video.videoId) {
+        mutableStateOf(false)
+    }
+    var modeContextPulse by remember(video.videoId) {
+        mutableStateOf(0)
+    }
 
     LaunchedEffect(
         playbackState,
@@ -1175,6 +1184,14 @@ private fun PlayerScreen(
         if (previousArmed) {
             delay(2500)
             previousArmed = false
+        }
+    }
+
+    LaunchedEffect(modeContextPulse) {
+        if (modeContextActive || modeContextSuppressed) {
+            delay(2200)
+            modeContextActive = false
+            modeContextSuppressed = false
         }
     }
 
@@ -1305,33 +1322,68 @@ private fun PlayerScreen(
                 onControl = { action ->
                     controlPulse += 1
 
-                    if (action == "MODE") {
+                    val directionalAction = action == "UP" ||
+                        action == "SKIP" ||
+                        action == "SEEK_BACK" ||
+                        action == "SEEK_FORWARD"
+
+                    fun registerDirectionalContext() {
+                        when {
+                            modeContextActive -> {
+                                modeContextActive = false
+                                modeContextSuppressed = true
+                                modeContextPulse += 1
+                            }
+
+                            modeContextSuppressed -> {
+                                modeContextPulse += 1
+                            }
+
+                            else -> {
+                                modeContextActive = true
+                                modeContextPulse += 1
+                            }
+                        }
+                    }
+
+                    fun switchPlayerMode() {
                         playerMode = if (playerMode == PlayerMode.VIDEO) {
                             PlayerMode.LISTEN
                         } else {
                             PlayerMode.VIDEO
                         }
-                        controlsForcedHidden = false
-                        overlayVisible = true
-                        previousArmed = false
-                        skipArmed = false
-                        pendingSeekSeconds = 0
-                        controlFeedback = if (playerMode == PlayerMode.LISTEN) {
-                            "LISTEN MODE"
-                        } else {
-                            "VIDEO MODE"
-                        }
-                        true
-                    } else if (!overlayVisible) {
+                        modeContextActive = false
+                        modeContextSuppressed = false
                         controlsForcedHidden = false
                         overlayVisible = true
                         previousArmed = false
                         skipArmed = false
                         pendingSeekSeconds = 0
                         controlFeedback = null
+                    }
+
+                    if (!overlayVisible) {
+                        controlsForcedHidden = false
+                        overlayVisible = true
+                        previousArmed = false
+                        skipArmed = false
+                        pendingSeekSeconds = 0
+                        controlFeedback = null
+
+                        if (directionalAction) {
+                            registerDirectionalContext()
+                        }
+
+                        false
+                    } else if (action == "CONFIRM" && modeContextActive) {
+                        switchPlayerMode()
                         false
                     } else {
                         controlsForcedHidden = false
+
+                        if (directionalAction) {
+                            registerDirectionalContext()
+                        }
 
                         if (action == "UP") {
                             skipArmed = false
@@ -1388,6 +1440,7 @@ private fun PlayerScreen(
                                     }
                                 }
 
+                                "CONFIRM",
                                 "TOGGLE" -> {
                                     skipArmed = false
                                     pendingSeekSeconds = 0
@@ -1874,33 +1927,24 @@ private fun PlayerScreen(
                     ) {
                         PlayerControlChip(
                             "OK",
-                            if (playbackState == "PLAYING") "Pause" else "Play",
+                            if (modeContextActive) {
+                                "Switch mode"
+                            } else if (playbackState == "PLAYING") {
+                                "Pause"
+                            } else {
+                                "Play"
+                            },
                         )
                         PlayerControlChip("←", "10s")
                         PlayerControlChip("→", "30s")
                         PlayerControlChip("↑", "Previous")
                         PlayerControlChip("↓", "Skip")
                         PlayerControlChip("BACK", "Journey")
-                        PlayerControlChip("MENU", "Mode")
                     }
 
-                    PlayerModeSwitch(
+                    PlayerModeContextChip(
                         mode = playerMode,
-                        onToggle = {
-                            playerMode = if (playerMode == PlayerMode.VIDEO) {
-                                PlayerMode.LISTEN
-                            } else {
-                                PlayerMode.VIDEO
-                            }
-                            controlsForcedHidden = false
-                            overlayVisible = true
-                            controlFeedback = if (playerMode == PlayerMode.LISTEN) {
-                                "LISTEN MODE"
-                            } else {
-                                "VIDEO MODE"
-                            }
-                            controlPulse += 1
-                        },
+                        contextActive = modeContextActive,
                     )
                 }
             }
@@ -1909,81 +1953,92 @@ private fun PlayerScreen(
 }
 
 @Composable
-private fun PlayerModeSwitch(
+private fun PlayerModeContextChip(
     mode: PlayerMode,
-    onToggle: () -> Unit,
+    contextActive: Boolean,
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(50)
+    val targetMode = if (mode == PlayerMode.VIDEO) {
+        "LISTEN"
+    } else {
+        "VIDEO"
+    }
 
-    Button(
-        onClick = onToggle,
+    Row(
         modifier = Modifier
-            .onFocusChanged { focused = it.isFocused }
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) {
-                    Color(0xFFBDEBFF)
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (contextActive) {
+                    Color(0xFF0B2E52)
                 } else {
-                    Color.White.copy(alpha = 0.14f)
+                    Color(0xFF0D1724)
                 },
-                shape = shape,
+            )
+            .border(
+                width = 1.dp,
+                color = if (contextActive) {
+                    DeepenBlue.copy(alpha = 0.86f)
+                } else {
+                    Color.White.copy(alpha = 0.10f)
+                },
+                shape = RoundedCornerShape(50),
+            )
+            .padding(
+                horizontal = if (contextActive) 13.dp else 11.dp,
+                vertical = 6.dp,
             ),
-        shape = ButtonDefaults.shape(
-            shape = shape,
-            focusedShape = shape,
-            pressedShape = shape,
-        ),
-        scale = ButtonDefaults.scale(
-            scale = 1f,
-            focusedScale = 1.04f,
-            pressedScale = 0.98f,
-        ),
-        colors = ButtonDefaults.colors(
-            containerColor = Color(0xFF111A26),
-            contentColor = Color.White,
-            focusedContainerColor = Color(0xFF153354),
-            focusedContentColor = Color.White,
-            pressedContainerColor = Color(0xFF102844),
-            pressedContentColor = Color.White,
-        ),
-        contentPadding = PaddingValues(
-            horizontal = 12.dp,
-            vertical = 6.dp,
-        ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "VIDEO",
-            color = if (mode == PlayerMode.VIDEO) {
-                DeepenBlue
-            } else {
-                DeepenMuted
-            },
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        if (contextActive) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(DeepenBlue.copy(alpha = 0.16f))
+                    .border(
+                        width = 1.dp,
+                        color = DeepenBlue.copy(alpha = 0.42f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    text = "OK",
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
-        Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .height(16.dp)
-                .background(Color.White.copy(alpha = 0.16f)),
-        )
+            Text(
+                text = "SWITCH TO $targetMode",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.35.sp,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(DeepenBlue),
+            )
 
-        Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(7.dp))
 
-        Text(
-            text = "LISTEN",
-            color = if (mode == PlayerMode.LISTEN) {
-                DeepenBlue
-            } else {
-                DeepenMuted
-            },
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-        )
+            Text(
+                text = if (mode == PlayerMode.LISTEN) {
+                    "LISTEN"
+                } else {
+                    "VIDEO"
+                },
+                color = DeepenMuted,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp,
+            )
+        }
     }
 }
 
@@ -2041,9 +2096,9 @@ private fun YouTubePlayer(
                 AndroidKeyEvent.KEYCODE_DPAD_CENTER,
                 AndroidKeyEvent.KEYCODE_ENTER,
                 AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
-                AndroidKeyEvent.KEYCODE_BUTTON_A,
-                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
+                AndroidKeyEvent.KEYCODE_BUTTON_A -> "CONFIRM"
 
+                AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> "TOGGLE"
                 AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> "PLAY"
                 AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> "PAUSE"
 
@@ -2059,11 +2114,6 @@ private fun YouTubePlayer(
                 AndroidKeyEvent.KEYCODE_DPAD_DOWN,
                 AndroidKeyEvent.KEYCODE_MEDIA_NEXT -> "SKIP"
 
-                AndroidKeyEvent.KEYCODE_MENU,
-                AndroidKeyEvent.KEYCODE_SETTINGS,
-                AndroidKeyEvent.KEYCODE_INFO,
-                AndroidKeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> "MODE"
-
                 else -> null
             }
 
@@ -2075,6 +2125,7 @@ private fun YouTubePlayer(
                     event.repeatCount == 0
                 ) {
                     val script = when (action) {
+                        "CONFIRM",
                         "TOGGLE" -> "togglePlayback();"
                         "PLAY" -> "playVideo();"
                         "PAUSE" -> "pauseVideo();"
