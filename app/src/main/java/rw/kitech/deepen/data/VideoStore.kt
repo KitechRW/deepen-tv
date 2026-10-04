@@ -479,8 +479,14 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
                 put("featured", 1)
                 put("featured_order", channel.featuredOrder)
 
-                if (channel.id == ChannelCatalog.DEFAULT_CHANNEL_ID) {
-                    put("youtube_handle", "drpaulmgitwaza")
+                channel.youtubeChannelId?.takeIf { it.isNotBlank() }?.let {
+                    put("youtube_channel_id", it)
+                }
+                channel.youtubeHandle?.removePrefix("@")?.takeIf { it.isNotBlank() }?.let {
+                    put("youtube_handle", it)
+                }
+                channel.thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
+                    put("thumbnail_url", it)
                 }
 
                 if (channel.sourceName.isNotBlank()) {
