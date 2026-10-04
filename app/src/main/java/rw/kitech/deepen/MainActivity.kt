@@ -730,6 +730,13 @@ private fun HomeScreen(
             }
         }
 
+        DeepenSettingsButton(
+            onClick = onSettings,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 60.dp, bottom = 38.dp),
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
