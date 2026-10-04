@@ -6,6 +6,7 @@ data class ChannelSource(
     val sourceName: String,
     val youtubeChannelId: String? = null,
     val youtubeHandle: String? = null,
+    val thumbnailUrl: String? = null,
     val lookupQuery: String,
     val featured: Boolean = false,
     val featuredOrder: Int = 0,
@@ -23,4 +24,5 @@ data class ChannelSearchResult(
     val youtubeChannelId: String,
     val displayName: String,
     val handle: String? = null,
+    val thumbnailUrl: String? = null,
 )
