@@ -50,6 +50,15 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
                 """.trimIndent()
             )
         }
+
+        if (oldVersion == 2 && newVersion >= 3) {
+            db.execSQL(
+                """
+                ALTER TABLE channels
+                ADD COLUMN thumbnail_url TEXT
+                """.trimIndent()
+            )
+        }
     }
 
     override fun onOpen(db: SQLiteDatabase) {
@@ -61,7 +70,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         readableDatabase.rawQuery(
             """
             SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
-                   lookup_query, featured, featured_order, is_default, user_added
+                   lookup_query, featured, featured_order, is_default, user_added, thumbnail_url
             FROM channels
             WHERE is_default = 1
             ORDER BY featured_order ASC, display_name ASC
@@ -83,7 +92,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         readableDatabase.rawQuery(
             """
             SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
-                   lookup_query, featured, featured_order, is_default, user_added
+                   lookup_query, featured, featured_order, is_default, user_added, thumbnail_url
             FROM channels
             WHERE id = ?
             LIMIT 1
@@ -98,7 +107,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         return readChannels(
             """
             SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
-                   lookup_query, featured, featured_order, is_default, user_added
+                   lookup_query, featured, featured_order, is_default, user_added, thumbnail_url
             FROM channels
             WHERE featured = 1
             ORDER BY featured_order ASC, display_name ASC
@@ -110,7 +119,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         return readChannels(
             """
             SELECT id, display_name, source_name, youtube_channel_id, youtube_handle,
-                   lookup_query, featured, featured_order, is_default, user_added
+                   lookup_query, featured, featured_order, is_default, user_added, thumbnail_url
             FROM channels
             WHERE user_added = 1
             ORDER BY display_name COLLATE NOCASE ASC
@@ -128,6 +137,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
             put("source_name", result.displayName)
             put("youtube_channel_id", result.youtubeChannelId)
             handle?.let { put("youtube_handle", it) }
+            result.thumbnailUrl?.let { put("thumbnail_url", it) }
             put("lookup_query", result.displayName)
             put("featured", 0)
             put("featured_order", 999)
@@ -148,6 +158,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
             sourceName = result.displayName,
             youtubeChannelId = result.youtubeChannelId,
             youtubeHandle = handle,
+            thumbnailUrl = result.thumbnailUrl,
             lookupQuery = result.displayName,
             isUserAdded = true,
         )
@@ -180,12 +191,16 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
         youtubeChannelId: String,
         sourceName: String,
         handle: String?,
+        thumbnailUrl: String?,
     ) {
         val values = ContentValues().apply {
             put("youtube_channel_id", youtubeChannelId)
             put("source_name", sourceName)
             handle?.removePrefix("@")?.takeIf { it.isNotBlank() }?.let {
                 put("youtube_handle", it)
+            }
+            thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
+                put("thumbnail_url", it)
             }
         }
 
@@ -403,7 +418,8 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
                 featured INTEGER NOT NULL DEFAULT 0,
                 featured_order INTEGER NOT NULL DEFAULT 999,
                 is_default INTEGER NOT NULL DEFAULT 0,
-                user_added INTEGER NOT NULL DEFAULT 0
+                user_added INTEGER NOT NULL DEFAULT 0,
+                thumbnail_url TEXT
             )
             """.trimIndent()
         )
@@ -442,6 +458,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
                 put("source_name", channel.sourceName)
                 channel.youtubeChannelId?.let { put("youtube_channel_id", it) }
                 channel.youtubeHandle?.let { put("youtube_handle", it.removePrefix("@")) }
+                channel.thumbnailUrl?.let { put("thumbnail_url", it) }
                 put("lookup_query", channel.lookupQuery)
                 put("featured", 1)
                 put("featured_order", channel.featuredOrder)
@@ -502,6 +519,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
             featuredOrder = getInt(7),
             isDefault = getInt(8) == 1,
             isUserAdded = getInt(9) == 1,
+            thumbnailUrl = getStringOrNull(10),
         )
     }
 
@@ -522,7 +540,7 @@ class VideoStore(context: Context) : SQLiteOpenHelper(
 
     companion object {
         private const val DATABASE_NAME = "deepen.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
         private const val COMPLETION_THRESHOLD = 0.95
     }
 }
