@@ -1,31 +1,47 @@
 package rw.kitech.deepen.data
 
 import org.json.JSONObject
+import rw.kitech.deepen.model.ChannelSearchResult
+import rw.kitech.deepen.model.ChannelSource
 import rw.kitech.deepen.model.VideoItem
-import java.io.BufferedReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 
 data class SyncResult(
     val added: Int,
     val total: Int,
 )
 
+private data class ResolvedChannel(
+    val youtubeChannelId: String,
+    val title: String,
+    val handle: String?,
+    val uploadsPlaylistId: String,
+)
+
 object YouTubeArchive {
     private const val API_BASE = "https://www.googleapis.com/youtube/v3"
-    private const val CHANNEL_HANDLE = "drpaulmgitwaza"
 
     fun sync(
         apiKey: String,
+        channel: ChannelSource,
         store: VideoStore,
     ): SyncResult {
         require(apiKey.isNotBlank()) {
             "YOUTUBE_API_KEY is missing. Add it to the build configuration."
         }
 
-        val uploadsPlaylistId = resolveUploadsPlaylist(apiKey)
-        val hasExistingArchive = store.stats().total > 0
+        val resolved = resolveChannel(apiKey, channel)
+        store.updateChannelIdentity(
+            channelId = channel.id,
+            youtubeChannelId = resolved.youtubeChannelId,
+            sourceName = resolved.title,
+            handle = resolved.handle,
+        )
+
+        val hasExistingArchive = store.stats(channel.id).total > 0
         val additions = mutableListOf<VideoItem>()
 
         var pageToken: String? = null
@@ -36,7 +52,7 @@ object YouTubeArchive {
                 endpoint = "playlistItems",
                 parameters = buildMap {
                     put("part", "snippet,contentDetails")
-                    put("playlistId", uploadsPlaylistId)
+                    put("playlistId", resolved.uploadsPlaylistId)
                     put("maxResults", "50")
                     put("key", apiKey)
                     pageToken?.let { put("pageToken", it) }
@@ -64,7 +80,7 @@ object YouTubeArchive {
                         continue
                     }
 
-                    if (hasExistingArchive && store.isKnown(videoId)) {
+                    if (hasExistingArchive && store.isKnown(channel.id, videoId)) {
                         reachedKnownVideo = true
                         break
                     }
@@ -83,40 +99,202 @@ object YouTubeArchive {
                 .takeIf { it.isNotBlank() }
         } while (pageToken != null)
 
-        store.upsertArchiveItems(additions)
+        store.upsertArchiveItems(channel.id, additions)
 
         return SyncResult(
             added = additions.size,
-            total = store.stats().total,
+            total = store.stats(channel.id).total,
         )
     }
 
-    private fun resolveUploadsPlaylist(apiKey: String): String {
+    fun searchChannels(
+        apiKey: String,
+        query: String,
+    ): List<ChannelSearchResult> {
+        require(apiKey.isNotBlank()) {
+            "YOUTUBE_API_KEY is missing. Add it to the build configuration."
+        }
+
+        val cleanedQuery = query.trim()
+        if (cleanedQuery.isBlank()) return emptyList()
+
+        val searchJson = getJson(
+            endpoint = "search",
+            parameters = mapOf(
+                "part" to "snippet",
+                "type" to "channel",
+                "q" to cleanedQuery,
+                "maxResults" to "8",
+                "key" to apiKey,
+            ),
+        )
+
+        val ordered = mutableListOf<Pair<String, String>>()
+        val items = searchJson.optJSONArray("items")
+        if (items != null) {
+            for (index in 0 until items.length()) {
+                val item = items.getJSONObject(index)
+                val channelId = item
+                    .optJSONObject("id")
+                    ?.optString("channelId")
+                    .orEmpty()
+                val title = item
+                    .optJSONObject("snippet")
+                    ?.optString("title")
+                    .orEmpty()
+
+                if (channelId.isNotBlank() && title.isNotBlank()) {
+                    ordered += channelId to title
+                }
+            }
+        }
+
+        if (ordered.isEmpty()) return emptyList()
+
+        val details = getJson(
+            endpoint = "channels",
+            parameters = mapOf(
+                "part" to "snippet",
+                "id" to ordered.joinToString(",") { it.first },
+                "maxResults" to ordered.size.toString(),
+                "key" to apiKey,
+            ),
+        )
+
+        val handlesById = mutableMapOf<String, String?>()
+        val titlesById = mutableMapOf<String, String>()
+        val detailItems = details.optJSONArray("items")
+        if (detailItems != null) {
+            for (index in 0 until detailItems.length()) {
+                val item = detailItems.getJSONObject(index)
+                val id = item.optString("id")
+                val snippet = item.optJSONObject("snippet")
+                val handle = snippet
+                    ?.optString("customUrl")
+                    ?.removePrefix("@")
+                    ?.takeIf { it.isNotBlank() }
+                val title = snippet?.optString("title").orEmpty()
+
+                if (id.isNotBlank()) {
+                    handlesById[id] = handle
+                    if (title.isNotBlank()) {
+                        titlesById[id] = title
+                    }
+                }
+            }
+        }
+
+        return ordered.map { (channelId, searchTitle) ->
+            ChannelSearchResult(
+                youtubeChannelId = channelId,
+                displayName = titlesById[channelId] ?: searchTitle,
+                handle = handlesById[channelId],
+            )
+        }
+    }
+
+    private fun resolveChannel(
+        apiKey: String,
+        channel: ChannelSource,
+    ): ResolvedChannel {
+        channel.youtubeChannelId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return fetchChannelDetails(apiKey, "id", it) }
+
+        channel.youtubeHandle
+            ?.removePrefix("@")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { handle ->
+                return fetchChannelDetails(apiKey, "forHandle", handle)
+            }
+
+        val candidates = searchChannels(
+            apiKey = apiKey,
+            query = channel.lookupQuery,
+        )
+
+        val candidate = candidates
+            .maxByOrNull { result ->
+                similarityScore(
+                    target = channel.displayName + " " + channel.sourceName,
+                    candidate = result.displayName,
+                )
+            }
+            ?: error("Could not find the YouTube channel for " + channel.displayName + ".")
+
+        return fetchChannelDetails(
+            apiKey = apiKey,
+            selector = "id",
+            selectorValue = candidate.youtubeChannelId,
+        )
+    }
+
+    private fun fetchChannelDetails(
+        apiKey: String,
+        selector: String,
+        selectorValue: String,
+    ): ResolvedChannel {
         val json = getJson(
             endpoint = "channels",
             parameters = mapOf(
-                "part" to "contentDetails",
-                "forHandle" to CHANNEL_HANDLE,
+                "part" to "snippet,contentDetails",
+                selector to selectorValue,
                 "key" to apiKey,
             ),
         )
 
         val items = json.optJSONArray("items")
         if (items == null || items.length() == 0) {
-            error("Could not resolve the YouTube channel @$CHANNEL_HANDLE.")
+            error("Could not resolve the selected YouTube channel.")
         }
 
-        val uploads = items
-            .getJSONObject(0)
-            .getJSONObject("contentDetails")
-            .getJSONObject("relatedPlaylists")
-            .optString("uploads")
+        val item = items.getJSONObject(0)
+        val snippet = item.optJSONObject("snippet")
+        val contentDetails = item.optJSONObject("contentDetails")
+        val youtubeChannelId = item.optString("id")
+        val title = snippet?.optString("title").orEmpty()
+        val handle = snippet
+            ?.optString("customUrl")
+            ?.removePrefix("@")
+            ?.takeIf { it.isNotBlank() }
+        val uploads = contentDetails
+            ?.optJSONObject("relatedPlaylists")
+            ?.optString("uploads")
+            .orEmpty()
 
-        if (uploads.isBlank()) {
-            error("The YouTube channel does not expose an uploads playlist.")
+        if (youtubeChannelId.isBlank() || uploads.isBlank()) {
+            error("The selected YouTube channel does not expose an uploads playlist.")
         }
 
-        return uploads
+        return ResolvedChannel(
+            youtubeChannelId = youtubeChannelId,
+            title = title.ifBlank { selectorValue },
+            handle = handle,
+            uploadsPlaylistId = uploads,
+        )
+    }
+
+    private fun similarityScore(
+        target: String,
+        candidate: String,
+    ): Int {
+        val targetTokens = normalize(target)
+            .split(" ")
+            .filter { it.length >= 3 }
+            .toSet()
+        val candidateTokens = normalize(candidate)
+            .split(" ")
+            .filter { it.length >= 3 }
+            .toSet()
+
+        return targetTokens.count { it in candidateTokens }
+    }
+
+    private fun normalize(value: String): String {
+        return value
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
     }
 
     private fun getJson(
@@ -124,10 +302,10 @@ object YouTubeArchive {
         parameters: Map<String, String>,
     ): JSONObject {
         val query = parameters.entries.joinToString("&") { (key, value) ->
-            "${encode(key)}=${encode(value)}"
+            encode(key) + "=" + encode(value)
         }
 
-        val connection = URL("$API_BASE/$endpoint?$query")
+        val connection = URL(API_BASE + "/" + endpoint + "?" + query)
             .openConnection() as HttpURLConnection
 
         connection.requestMethod = "GET"
@@ -154,7 +332,7 @@ object YouTubeArchive {
 
                 error(
                     apiMessage?.takeIf { it.isNotBlank() }
-                        ?: "YouTube API request failed with HTTP $responseCode."
+                        ?: "YouTube API request failed with HTTP " + responseCode + "."
                 )
             }
 
