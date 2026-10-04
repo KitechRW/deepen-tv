@@ -1426,7 +1426,18 @@ private fun PlayerScreen(
                             registerDirectionalContext()
                         }
 
-                        false
+                        val playbackAction =
+                            action == "CONFIRM" ||
+                            action == "TOGGLE" ||
+                            action == "PLAY" ||
+                            action == "PAUSE"
+
+                        if (playbackAction) {
+                            centerPlaybackControlVisible = true
+                            centerPlaybackControlPulse += 1
+                        }
+
+                        playbackAction
                     } else if (action == "CONFIRM" && modeContextActive) {
                         switchPlayerMode()
                         false
@@ -1500,9 +1511,6 @@ private fun PlayerScreen(
 
                                 "CONFIRM",
                                 "TOGGLE" -> {
-                                    if (playbackState == "PLAYING") {
-                                        playbackState = "PAUSED"
-                                    }
                                     centerPlaybackControlVisible = true
                                     centerPlaybackControlPulse += 1
                                     skipArmed = false
@@ -1519,7 +1527,6 @@ private fun PlayerScreen(
                                 }
 
                                 "PAUSE" -> {
-                                    playbackState = "PAUSED"
                                     centerPlaybackControlVisible = true
                                     centerPlaybackControlPulse += 1
                                     skipArmed = false
