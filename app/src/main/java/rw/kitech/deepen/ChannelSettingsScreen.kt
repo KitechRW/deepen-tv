@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,6 +35,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import coil3.compose.AsyncImage
 import androidx.compose.foundation.Image
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -267,21 +269,11 @@ private fun SelectedChannelPanel(
         Row(
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .background(
-                        color = Color(0xFF111D2F),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_youtube_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                )
-            }
+            ChannelAvatar(
+                imageUrl = channel.thumbnailUrl,
+                contentDescription = channel.displayName,
+                size = 58,
+            )
 
             Spacer(modifier = Modifier.width(18.dp))
 
@@ -401,10 +393,10 @@ private fun ChannelCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_youtube_white),
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
+                ChannelAvatar(
+                    imageUrl = channel.thumbnailUrl,
+                    contentDescription = channel.displayName,
+                    size = 30,
                 )
 
                 Text(
@@ -617,9 +609,21 @@ private fun SearchResultCard(
         ),
         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            ChannelAvatar(
+                imageUrl = result.thumbnailUrl,
+                contentDescription = result.displayName,
+                size = 38,
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+            ) {
             Text(
                 text = result.displayName,
                 color = Color.White,
@@ -636,6 +640,41 @@ private fun SearchResultCard(
                 color = if (result.handle == null) ChannelSettingsBlue else ChannelSettingsMuted,
                 fontSize = 11.sp,
                 maxLines = 1,
+            )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChannelAvatar(
+    imageUrl: String?,
+    contentDescription: String?,
+    size: Int,
+) {
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF111D2F)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageUrl.isNullOrBlank()) {
+            Image(
+                painter = painterResource(R.drawable.ic_youtube_white),
+                contentDescription = contentDescription,
+                modifier = Modifier.size((size * 0.52f).dp),
+            )
+        } else {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                placeholder = painterResource(R.drawable.ic_youtube_white),
+                error = painterResource(R.drawable.ic_youtube_white),
+                fallback = painterResource(R.drawable.ic_youtube_white),
             )
         }
     }
