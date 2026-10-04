@@ -1,9 +1,12 @@
 package rw.kitech.deepen
 
-import android.app.Activity
-import android.content.ActivityNotFoundException
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +33,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +49,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -56,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import rw.kitech.deepen.model.ChannelSearchResult
 import java.util.Locale
@@ -77,62 +83,178 @@ internal fun ChannelSearchScreen(
     var inputText by remember { mutableStateOf(query) }
     var voiceAlternatives by remember { mutableStateOf<List<String>>(emptyList()) }
     var voiceError by remember { mutableStateOf<String?>(null) }
+    var isListening by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     val voiceFocusRequester = remember { FocusRequester() }
     val textFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val voiceLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val alternatives = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.distinct()
-                ?.take(3)
-                .orEmpty()
-
-            if (alternatives.isEmpty()) {
-                voiceAlternatives = emptyList()
-                voiceError = "Didn't catch that. Try again or type instead."
-            } else {
-                val spokenText = alternatives.first()
-                voiceAlternatives = alternatives
-                voiceError = null
-                inputText = spokenText
-                onQueryChange(spokenText)
-            }
-        }
-    }
-
-    fun startVoiceSearch() {
-        voiceError = null
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    val recognitionIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
             )
-            putExtra(
-                RecognizerIntent.EXTRA_PROMPT,
-                "Say a preacher, ministry or YouTube channel",
-            )
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-        }
-
-        try {
-            voiceLauncher.launch(intent)
-        } catch (_: ActivityNotFoundException) {
-            voiceAlternatives = emptyList()
-            voiceError = "Voice search is not available on this TV. Use Type Search."
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                Locale.getDefault().toLanguageTag(),
+            )
         }
     }
 
-    fun focusTyping() {
-        textFocusRequester.requestFocus()
-        keyboardController?.show()
+    val recognitionAvailable = remember(context) {
+        SpeechRecognizer.isRecognitionAvailable(context)
+    }
+
+    val speechRecognizer = remember(context, recognitionAvailable) {
+        if (recognitionAvailable) {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        } else {
+            null
+        }
+    }
+
+    fun renderSpeechText(text: String) {
+        val normalized = text.trim()
+        if (normalized.isBlank()) return
+
+        inputText = normalized
+        onQueryChange(normalized)
+    }
+
+    DisposableEffect(speechRecognizer) {
+        speechRecognizer?.setRecognitionListener(
+            object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    isListening = true
+                    voiceError = null
+                }
+
+                override fun onBeginningOfSpeech() {
+                    isListening = true
+                }
+
+                override fun onRmsChanged(rmsdB: Float) = Unit
+
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+
+                override fun onEndOfSpeech() = Unit
+
+                override fun onError(error: Int) {
+                    isListening = false
+
+                    voiceError = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH,
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                            "Didn't catch that. Press the mic and try again."
+
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                            "Microphone permission is required for voice search."
+
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
+                            "Voice search is busy. Try again."
+
+                        else ->
+                            "Voice search stopped. Press the mic to try again."
+                    }
+                }
+
+                override fun onResults(results: Bundle?) {
+                    isListening = false
+
+                    val alternatives = results
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotBlank() }
+                        ?.distinct()
+                        ?.take(3)
+                        .orEmpty()
+
+                    voiceAlternatives = alternatives
+                    if (alternatives.isNotEmpty()) {
+                        voiceError = null
+                        renderSpeechText(alternatives.first())
+                    } else {
+                        voiceError = "Didn't catch that. Press the mic and try again."
+                    }
+                }
+
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val partial = partialResults
+                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
+                        ?.trim()
+                        .orEmpty()
+
+                    if (partial.isNotBlank()) {
+                        renderSpeechText(partial)
+                    }
+                }
+
+                override fun onEvent(eventType: Int, params: Bundle?) = Unit
+            },
+        )
+
+        onDispose {
+            speechRecognizer?.cancel()
+            speechRecognizer?.destroy()
+        }
+    }
+
+    val beginInlineRecognition: () -> Unit = {
+        val recognizer = speechRecognizer
+        if (recognizer == null) {
+            isListening = false
+            voiceError = "Voice recognition is not available on this TV."
+        } else {
+            voiceAlternatives = emptyList()
+            voiceError = null
+            keyboardController?.hide()
+            isListening = true
+
+            runCatching {
+                recognizer.startListening(recognitionIntent)
+            }.onFailure {
+                isListening = false
+                voiceError = "Voice search could not start. Try again."
+            }
+        }
+    }
+
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            beginInlineRecognition()
+        } else {
+            isListening = false
+            voiceError = "Microphone permission is required for voice search."
+        }
+    }
+
+    fun startVoiceSearch() {
+        if (isListening) {
+            speechRecognizer?.stopListening()
+            return
+        }
+
+        if (!recognitionAvailable) {
+            voiceError = "Voice recognition is not available on this TV."
+            return
+        }
+
+        val microphoneGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (microphoneGranted) {
+            beginInlineRecognition()
+        } else {
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     LaunchedEffect(query) {
@@ -206,6 +328,7 @@ internal fun ChannelSearchScreen(
                         onClear()
                     },
                     onSearch = onSearch,
+                    listening = isListening,
                     voiceFocusRequester = voiceFocusRequester,
                     textFocusRequester = textFocusRequester,
                     modifier = Modifier.weight(1f),
@@ -237,28 +360,19 @@ internal fun ChannelSearchScreen(
                         label = "TRY AGAIN",
                         onClick = ::startVoiceSearch,
                     )
-
-                    SearchActionButton(
-                        label = "TYPE INSTEAD",
-                        onClick = ::focusTyping,
-                    )
                 }
             }
 
-            if (voiceAlternatives.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
+            if (voiceAlternatives.size > 1 && !isListening) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-                VoiceReviewPanel(
-                    query = inputText,
+                VoiceAlternativesRow(
+                    currentText = inputText,
                     alternatives = voiceAlternatives,
-                    onChooseAlternative = { alternative ->
+                    onChoose = { alternative ->
                         inputText = alternative
                         onQueryChange(alternative)
                     },
-                    onSearch = onSearch,
-                    onTryAgain = ::startVoiceSearch,
-                    onEdit = ::focusTyping,
-                    searching = searching,
                 )
             }
 
@@ -400,99 +514,31 @@ private fun SearchHeader(
 }
 
 @Composable
-private fun VoiceReviewPanel(
-    query: String,
+private fun VoiceAlternativesRow(
+    currentText: String,
     alternatives: List<String>,
-    onChooseAlternative: (String) -> Unit,
-    onSearch: () -> Unit,
-    onTryAgain: () -> Unit,
-    onEdit: () -> Unit,
-    searching: Boolean,
+    onChoose: (String) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color(0xFF0A1C31).copy(alpha = 0.96f),
-                        Color(0xFF0A1627).copy(alpha = 0.92f),
-                    ),
-                ),
-                shape = RoundedCornerShape(16.dp),
-            )
-            .border(
-                width = 1.dp,
-                color = SearchBlue.copy(alpha = 0.30f),
-                shape = RoundedCornerShape(16.dp),
-            )
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+    val otherAlternatives = alternatives
+        .filter { it != currentText }
+        .take(2)
+
+    if (otherAlternatives.isEmpty()) return
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "VOICE RESULT",
-            color = SearchBlue,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
+            text = "Other possibilities",
+            color = SearchMuted,
+            fontSize = 11.sp,
         )
 
-        Spacer(modifier = Modifier.height(5.dp))
-
-        Text(
-            text = "Heard: “$query”",
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-
-        if (alternatives.size > 1) {
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Other matches:",
-                    color = SearchMuted,
-                    fontSize = 11.sp,
-                )
-
-                alternatives
-                    .filter { it != query }
-                    .take(2)
-                    .forEach { alternative ->
-                        SearchActionButton(
-                            label = alternative,
-                            onClick = { onChooseAlternative(alternative) },
-                        )
-                    }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        otherAlternatives.forEach { alternative ->
             SearchActionButton(
-                label = if (searching) "SEARCHING…" else "SEARCH THIS",
-                onClick = onSearch,
-                enabled = query.isNotBlank() && !searching,
-                emphasized = true,
-            )
-
-            SearchActionButton(
-                label = "TRY AGAIN",
-                onClick = onTryAgain,
-            )
-
-            SearchActionButton(
-                label = "EDIT",
-                onClick = onEdit,
+                label = alternative,
+                onClick = { onChoose(alternative) },
             )
         }
     }
@@ -505,6 +551,7 @@ private fun SearchTextField(
     onVoiceClick: () -> Unit,
     onClear: () -> Unit,
     onSearch: () -> Unit,
+    listening: Boolean,
     voiceFocusRequester: FocusRequester,
     textFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
@@ -533,8 +580,9 @@ private fun SearchTextField(
     ) {
         SearchInputIconButton(
             drawableRes = R.drawable.ic_mic_search,
-            contentDescription = "Voice search",
+            contentDescription = if (listening) "Finish voice search" else "Voice search",
             onClick = onVoiceClick,
+            active = listening,
             modifier = Modifier.focusRequester(voiceFocusRequester),
         )
 
@@ -576,6 +624,18 @@ private fun SearchTextField(
             )
         }
 
+        if (listening) {
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Text(
+                text = "LISTENING…",
+                color = SearchBlue,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+            )
+        }
+
         if (value.isNotBlank()) {
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -592,6 +652,7 @@ private fun SearchInputIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    active: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = CircleShape
@@ -603,10 +664,10 @@ private fun SearchInputIconButton(
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
-                color = if (focused) {
-                    Color(0xFFBDEBFF)
-                } else {
-                    SearchBlue.copy(alpha = 0.28f)
+                color = when {
+                    focused -> Color(0xFFBDEBFF)
+                    active -> SearchBlue
+                    else -> SearchBlue.copy(alpha = 0.28f)
                 },
                 shape = shape,
             ),
@@ -621,7 +682,11 @@ private fun SearchInputIconButton(
             pressedScale = 0.96f,
         ),
         colors = ButtonDefaults.colors(
-            containerColor = Color(0xFF103357).copy(alpha = 0.90f),
+            containerColor = if (active) {
+                Color(0xFF1B6EB4)
+            } else {
+                Color(0xFF103357).copy(alpha = 0.90f)
+            },
             contentColor = Color.White,
             focusedContainerColor = Color(0xFF1B6EB4),
             focusedContentColor = Color.White,
@@ -842,7 +907,7 @@ private fun EmptySearchState() {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "Recognized speech appears directly in the input so you can correct it before searching.",
+                text = "Speak naturally. Your words appear in the field while you are talking, then you can correct or search.",
                 color = SearchMuted,
                 fontSize = 12.sp,
             )
