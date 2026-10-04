@@ -348,26 +348,18 @@ private fun DeepenApp() {
                 }
             },
         )
-    } else if (settingsOpen) {
-        ChannelSettingsScreen(
-            defaultChannel = defaultChannel,
-            selectedChannel = selectedSettingsChannel,
-            featuredChannels = featuredChannels,
-            userChannels = userChannels,
-            searchOpen = searchOpen,
-            searchQuery = searchQuery,
-            searchResults = searchResults,
+    } else if (settingsOpen && searchOpen) {
+        ChannelSearchScreen(
+            query = searchQuery,
+            results = searchResults,
             searching = searching,
-            searchError = searchError,
-            onSearchToggle = {
-                searchOpen = !searchOpen
-                if (!searchOpen) {
-                    searchResults = emptyList()
-                    searchError = null
-                }
-            },
-            onSearchQueryChange = { query ->
+            error = searchError,
+            existingChannelIds = (featuredChannels + userChannels)
+                .mapNotNull { channel -> channel.youtubeChannelId }
+                .toSet(),
+            onQueryChange = { query ->
                 searchQuery = query
+                searchResults = emptyList()
                 searchError = null
             },
             onSearch = {
@@ -375,22 +367,56 @@ private fun DeepenApp() {
                     searchYouTubeChannels()
                 }
             },
-            onSelectChannel = { channel ->
-                selectedSettingsChannel = channel
+            onClear = {
+                searchQuery = ""
+                searchResults = emptyList()
+                searchError = null
             },
-            onAddSearchResult = { result ->
+            onChooseResult = { result ->
                 scope.launch {
-                    val added = withContext(Dispatchers.IO) {
-                        store.addUserChannel(result)
+                    val existing = (featuredChannels + userChannels)
+                        .firstOrNull { channel ->
+                            channel.youtubeChannelId == result.youtubeChannelId
+                        }
+
+                    val selected = if (existing != null) {
+                        existing
+                    } else {
+                        val added = withContext(Dispatchers.IO) {
+                            store.addUserChannel(result)
+                        }
+                        refreshChannels(added.id)
+                        withContext(Dispatchers.IO) {
+                            store.channel(added.id)
+                        } ?: added
                     }
-                    refreshChannels(added.id)
-                    selectedSettingsChannel = withContext(Dispatchers.IO) {
-                        store.channel(added.id)
-                    } ?: added
+
+                    selectedSettingsChannel = selected
                     searchOpen = false
+                    searchQuery = ""
                     searchResults = emptyList()
                     searchError = null
                 }
+            },
+            onBack = {
+                searchOpen = false
+                searchError = null
+            },
+        )
+    } else if (settingsOpen) {
+        ChannelSettingsScreen(
+            defaultChannel = defaultChannel,
+            selectedChannel = selectedSettingsChannel,
+            featuredChannels = featuredChannels,
+            userChannels = userChannels,
+            onSearchOpen = {
+                searchQuery = ""
+                searchResults = emptyList()
+                searchError = null
+                searchOpen = true
+            },
+            onSelectChannel = { channel ->
+                selectedSettingsChannel = channel
             },
             onSetDefault = { channel ->
                 scope.launch {
@@ -440,6 +466,7 @@ private fun DeepenApp() {
             onBack = {
                 settingsOpen = false
                 searchOpen = false
+                searchQuery = ""
                 searchResults = emptyList()
                 searchError = null
                 selectedSettingsChannel = defaultChannel
