@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import coil3.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -439,6 +441,19 @@ private fun DeepenApp() {
             onSettings = {
                 selectedSettingsChannel = defaultChannel
                 settingsOpen = true
+
+                if (BuildConfig.YOUTUBE_API_KEY.isNotBlank()) {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            YouTubeArchive.refreshChannelMetadata(
+                                apiKey = BuildConfig.YOUTUBE_API_KEY,
+                                channels = featuredChannels,
+                                store = store,
+                            )
+                        }
+                        refreshChannels(defaultChannel.id)
+                    }
+                }
             },
         )
     }
@@ -544,15 +559,27 @@ private fun HomeScreen(
         ) {
             when {
                 currentVideo != null -> {
-                    Text(
-                        text = currentVideo.title,
-                        color = Color.White,
-                        fontSize = 31.sp,
-                        lineHeight = 43.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        HomeChannelAvatar(
+                            imageUrl = activeChannel.thumbnailUrl,
+                            contentDescription = activeChannel.displayName,
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Text(
+                            text = currentVideo.title,
+                            color = Color.White,
+                            fontSize = 31.sp,
+                            lineHeight = 43.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -757,6 +784,39 @@ private fun HomeScreen(
                         .background(DeepenBlue),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeChannelAvatar(
+    imageUrl: String?,
+    contentDescription: String?,
+) {
+    Box(
+        modifier = Modifier
+            .size(54.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF111D2F)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageUrl.isNullOrBlank()) {
+            Image(
+                painter = painterResource(R.drawable.ic_youtube_white),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(28.dp),
+            )
+        } else {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                placeholder = painterResource(R.drawable.ic_youtube_white),
+                error = painterResource(R.drawable.ic_youtube_white),
+                fallback = painterResource(R.drawable.ic_youtube_white),
+            )
         }
     }
 }
