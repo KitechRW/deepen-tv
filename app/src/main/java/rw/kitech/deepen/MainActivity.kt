@@ -528,22 +528,13 @@ private fun HomeScreen(
             }
         }
 
-        Row(
+        DeepenSyncButton(
+            syncing = syncing,
+            onClick = onSync,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 44.dp, end = 60.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DeepenSyncButton(
-                syncing = syncing,
-                onClick = onSync,
-            )
-
-            DeepenSettingsButton(
-                onClick = onSettings,
-            )
-        }
+        )
 
         Column(
             modifier = Modifier
@@ -729,6 +720,13 @@ private fun HomeScreen(
                 }
             }
         }
+
+        DeepenSettingsButton(
+            onClick = onSettings,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 60.dp, bottom = 42.dp),
+        )
 
         Column(
             modifier = Modifier
