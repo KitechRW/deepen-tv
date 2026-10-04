@@ -1310,7 +1310,31 @@ private fun PlayerScreen(
                         0.0
                     }
                 },
-                onPlaybackState = { state ->
+                onPlaybackState = { state, telemetryPosition, telemetryDuration ->
+                    val syncedDuration = if (telemetryDuration > 0.0) {
+                        telemetryDuration
+                    } else {
+                        durationSeconds
+                    }
+                    val syncedPosition = if (syncedDuration > 0.0) {
+                        telemetryPosition.coerceIn(0.0, syncedDuration)
+                    } else {
+                        telemetryPosition.coerceAtLeast(0.0)
+                    }
+
+                    if (telemetryDuration > 0.0) {
+                        durationSeconds = telemetryDuration
+                    }
+
+                    if (
+                        state == "PLAYING" ||
+                        state == "PAUSED" ||
+                        state == "BUFFERING" ||
+                        state == "ENDED"
+                    ) {
+                        playbackPosition = syncedPosition
+                    }
+
                     playbackState = state
                     if (state == "PLAYING") {
                         playbackError = null
@@ -1320,7 +1344,11 @@ private fun PlayerScreen(
                         controlsForcedHidden = false
                         overlayVisible = true
                         controlFeedback = null
-                        persistProgress()
+                        onProgress(
+                            video.videoId,
+                            syncedPosition,
+                            syncedDuration,
+                        )
                     }
                 },
                 onPlaybackError = { code ->
@@ -1456,6 +1484,9 @@ private fun PlayerScreen(
 
                                 "CONFIRM",
                                 "TOGGLE" -> {
+                                    if (playbackState == "PLAYING") {
+                                        playbackState = "PAUSED"
+                                    }
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -1468,6 +1499,7 @@ private fun PlayerScreen(
                                 }
 
                                 "PAUSE" -> {
+                                    playbackState = "PAUSED"
                                     skipArmed = false
                                     pendingSeekSeconds = 0
                                     controlFeedback = null
@@ -2030,7 +2062,7 @@ private fun YouTubePlayer(
     modifier: Modifier = Modifier,
     onProgress: (String, Double, Double) -> Unit,
     onBufferTelemetry: (Double, Double, Double) -> Unit,
-    onPlaybackState: (String) -> Unit,
+    onPlaybackState: (String, Double, Double) -> Unit,
     onPlaybackError: (String) -> Unit,
     onControl: (String) -> Boolean,
     onEnded: (String) -> Unit,
@@ -2163,7 +2195,7 @@ private class PlayerBridge(
     private val videoId: String,
     private val onProgress: (String, Double, Double) -> Unit,
     private val onBufferTelemetry: (Double, Double, Double) -> Unit,
-    private val onPlaybackState: (String) -> Unit,
+    private val onPlaybackState: (String, Double, Double) -> Unit,
     private val onPlaybackError: (String) -> Unit,
     private val onEnded: (String) -> Unit,
 ) {
@@ -2182,9 +2214,17 @@ private class PlayerBridge(
     }
 
     @JavascriptInterface
-    fun onPlaybackState(state: String) {
+    fun onPlaybackState(
+        state: String,
+        currentSeconds: Double,
+        durationSeconds: Double,
+    ) {
         mainHandler.post {
-            onPlaybackState(state)
+            onPlaybackState(
+                state,
+                currentSeconds,
+                durationSeconds,
+            )
         }
     }
 
@@ -2283,7 +2323,7 @@ private fun youtubePlayerHtml(
                 }
 
                 function onPlayerReady(event) {
-                    AndroidBridge.onPlaybackState('READY');
+                    reportPlaybackState('READY');
                     disableCaptions();
                     setTimeout(disableCaptions, 300);
                     setTimeout(disableCaptions, 1200);
@@ -2312,6 +2352,14 @@ private fun youtubePlayerHtml(
                     AndroidBridge.onProgress(current, duration, loaded);
                 }
 
+                function reportPlaybackState(state) {
+                    if (!player || typeof player.getCurrentTime !== 'function') return;
+
+                    var current = player.getCurrentTime() || 0;
+                    var duration = player.getDuration() || 0;
+                    AndroidBridge.onPlaybackState(state, current, duration);
+                }
+
                 function onPlayerStateChange(event) {
                     if (event.data === YT.PlayerState.PLAYING) {
                         disableCaptions();
@@ -2319,20 +2367,20 @@ private fun youtubePlayerHtml(
                         if (playerElement) playerElement.style.opacity = '1';
                         var poster = document.getElementById('poster');
                         if (poster) poster.style.display = 'none';
-                        AndroidBridge.onPlaybackState('PLAYING');
+                        reportPlaybackState('PLAYING');
                     } else if (event.data === YT.PlayerState.PAUSED) {
-                        AndroidBridge.onPlaybackState('PAUSED');
+                        reportPlaybackState('PAUSED');
                         reportProgress();
                     } else if (event.data === YT.PlayerState.BUFFERING) {
-                        AndroidBridge.onPlaybackState('BUFFERING');
+                        reportPlaybackState('BUFFERING');
                         reportProgress();
                     } else if (event.data === YT.PlayerState.CUED) {
-                        AndroidBridge.onPlaybackState('READY');
+                        reportPlaybackState('READY');
                     }
 
                     if (event.data === YT.PlayerState.ENDED) {
                         reportProgress();
-                        AndroidBridge.onPlaybackState('ENDED');
+                        reportPlaybackState('ENDED');
                         if (progressTimer) {
                             clearInterval(progressTimer);
                         }
@@ -2348,7 +2396,7 @@ private fun youtubePlayerHtml(
                 }
 
                 function onAutoplayBlocked() {
-                    AndroidBridge.onPlaybackState('READY');
+                    reportPlaybackState('READY');
                 }
 
                 function playVideo() {
