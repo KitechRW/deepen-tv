@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,9 +65,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import rw.kitech.deepen.data.ChannelCatalog
 import rw.kitech.deepen.data.JourneyStats
 import rw.kitech.deepen.data.VideoStore
 import rw.kitech.deepen.data.YouTubeArchive
+import rw.kitech.deepen.model.ChannelSearchResult
+import rw.kitech.deepen.model.ChannelSource
 import rw.kitech.deepen.model.VideoItem
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -111,6 +116,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class InitialChannelState(
+    val channel: ChannelSource,
+    val featured: List<ChannelSource>,
+    val personal: List<ChannelSource>,
+    val video: VideoItem?,
+    val stats: JourneyStats,
+)
+
 @Composable
 private fun DeepenApp() {
     val context = LocalContext.current
@@ -123,17 +136,62 @@ private fun DeepenApp() {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var playerVideo by remember { mutableStateOf<VideoItem?>(null) }
 
-    suspend fun refreshLocalState() {
+    var defaultChannel by remember {
+        mutableStateOf(ChannelCatalog.featuredChannels.first())
+    }
+    var featuredChannels by remember {
+        mutableStateOf(ChannelCatalog.featuredChannels)
+    }
+    var userChannels by remember {
+        mutableStateOf<List<ChannelSource>>(emptyList())
+    }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var selectedSettingsChannel by remember {
+        mutableStateOf(ChannelCatalog.featuredChannels.first())
+    }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember {
+        mutableStateOf<List<ChannelSearchResult>>(emptyList())
+    }
+    var searching by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refreshChannels(
+        selectedChannelId: String = selectedSettingsChannel.id,
+    ) {
         val snapshot = withContext(Dispatchers.IO) {
-            store.currentVideo() to store.stats()
+            val currentDefault = store.defaultChannel()
+            val featured = store.featuredChannels()
+            val personal = store.userChannels()
+            Triple(currentDefault, featured, personal)
+        }
+
+        defaultChannel = snapshot.first
+        featuredChannels = snapshot.second
+        userChannels = snapshot.third
+
+        selectedSettingsChannel = (snapshot.second + snapshot.third)
+            .firstOrNull { channel -> channel.id == selectedChannelId }
+            ?: snapshot.first
+    }
+
+    suspend fun refreshLocalState(
+        channelId: String = defaultChannel.id,
+    ) {
+        val snapshot = withContext(Dispatchers.IO) {
+            store.currentVideo(channelId) to store.stats(channelId)
         }
         currentVideo = snapshot.first
         stats = snapshot.second
     }
 
-    suspend fun syncArchive() {
+    suspend fun syncArchive(channel: ChannelSource = defaultChannel) {
         if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
-            if (stats.total == 0) {
+            val channelTotal = withContext(Dispatchers.IO) {
+                store.stats(channel.id).total
+            }
+            if (channelTotal == 0) {
                 errorMessage = "Add YOUTUBE_API_KEY to build Deepen and load the teaching archive."
             }
             return
@@ -146,11 +204,18 @@ private fun DeepenApp() {
             withContext(Dispatchers.IO) {
                 YouTubeArchive.sync(
                     apiKey = BuildConfig.YOUTUBE_API_KEY,
+                    channel = channel,
                     store = store,
                 )
             }
         }.onSuccess {
-            refreshLocalState()
+            val activeDefaultId = withContext(Dispatchers.IO) {
+                store.defaultChannel().id
+            }
+            refreshChannels(selectedSettingsChannel.id)
+            if (channel.id == activeDefaultId) {
+                refreshLocalState(channel.id)
+            }
         }.onFailure { error ->
             errorMessage = error.message ?: "Deepen could not synchronize with YouTube."
         }
@@ -158,11 +223,64 @@ private fun DeepenApp() {
         syncing = false
     }
 
+    suspend fun searchYouTubeChannels() {
+        val query = searchQuery.trim()
+        if (query.isBlank()) return
+
+        if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
+            searchError = "This build does not contain a YouTube API key."
+            return
+        }
+
+        searching = true
+        searchError = null
+
+        runCatching {
+            withContext(Dispatchers.IO) {
+                YouTubeArchive.searchChannels(
+                    apiKey = BuildConfig.YOUTUBE_API_KEY,
+                    query = query,
+                )
+            }
+        }.onSuccess { results ->
+            searchResults = results
+            if (results.isEmpty()) {
+                searchError = "No YouTube channels matched this search."
+            }
+        }.onFailure { error ->
+            searchResults = emptyList()
+            searchError = error.message ?: "Deepen could not search YouTube."
+        }
+
+        searching = false
+    }
+
     LaunchedEffect(Unit) {
-        refreshLocalState()
+        val initial = withContext(Dispatchers.IO) {
+            val channel = store.defaultChannel()
+            val featured = store.featuredChannels()
+            val personal = store.userChannels()
+            val video = store.currentVideo(channel.id)
+            val channelStats = store.stats(channel.id)
+            InitialChannelState(
+                channel = channel,
+                featured = featured,
+                personal = personal,
+                video = video,
+                stats = channelStats,
+            )
+        }
+
+        defaultChannel = initial.channel
+        selectedSettingsChannel = initial.channel
+        featuredChannels = initial.featured
+        userChannels = initial.personal
+        currentVideo = initial.video
+        stats = initial.stats
+
         if (BuildConfig.YOUTUBE_API_KEY.isNotBlank()) {
-            syncArchive()
-        } else if (stats.total == 0) {
+            syncArchive(initial.channel)
+        } else if (initial.stats.total == 0) {
             errorMessage = "This build does not contain a YouTube API key."
         }
     }
@@ -183,7 +301,7 @@ private fun DeepenApp() {
                         store.markCompleted(videoId)
                     }
 
-                    refreshLocalState()
+                    refreshLocalState(defaultChannel.id)
 
                     if (currentVideo != null) {
                         playerVideo = currentVideo
@@ -198,7 +316,7 @@ private fun DeepenApp() {
                         store.markCompleted(videoId)
                     }
 
-                    refreshLocalState()
+                    refreshLocalState(defaultChannel.id)
 
                     if (currentVideo != null) {
                         playerVideo = currentVideo
@@ -210,11 +328,11 @@ private fun DeepenApp() {
             onPrevious = { videoId, onResult ->
                 scope.launch {
                     val previous = withContext(Dispatchers.IO) {
-                        store.rewindToPrevious(videoId)
+                        store.rewindToPrevious(defaultChannel.id, videoId)
                     }
 
                     if (previous != null) {
-                        refreshLocalState()
+                        refreshLocalState(defaultChannel.id)
                         playerVideo = previous
                         onResult(true)
                     } else {
@@ -225,7 +343,81 @@ private fun DeepenApp() {
             onExit = {
                 playerVideo = null
                 scope.launch {
-                    refreshLocalState()
+                    refreshLocalState(defaultChannel.id)
+                }
+            },
+        )
+    } else if (settingsOpen) {
+        ChannelSettingsScreen(
+            defaultChannel = defaultChannel,
+            selectedChannel = selectedSettingsChannel,
+            featuredChannels = featuredChannels,
+            userChannels = userChannels,
+            searchOpen = searchOpen,
+            searchQuery = searchQuery,
+            searchResults = searchResults,
+            searching = searching,
+            searchError = searchError,
+            onSearchToggle = {
+                searchOpen = !searchOpen
+                if (!searchOpen) {
+                    searchResults = emptyList()
+                    searchError = null
+                }
+            },
+            onSearchQueryChange = { query ->
+                searchQuery = query
+                searchError = null
+            },
+            onSearch = {
+                scope.launch {
+                    searchYouTubeChannels()
+                }
+            },
+            onSelectChannel = { channel ->
+                selectedSettingsChannel = channel
+            },
+            onAddSearchResult = { result ->
+                scope.launch {
+                    val added = withContext(Dispatchers.IO) {
+                        store.addUserChannel(result)
+                    }
+                    refreshChannels(added.id)
+                    selectedSettingsChannel = withContext(Dispatchers.IO) {
+                        store.channel(added.id)
+                    } ?: added
+                    searchOpen = false
+                    searchResults = emptyList()
+                    searchError = null
+                }
+            },
+            onSetDefault = { channel ->
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        store.setDefaultChannel(channel.id)
+                    }
+
+                    refreshChannels(channel.id)
+                    val selected = withContext(Dispatchers.IO) {
+                        store.channel(channel.id)
+                    } ?: channel
+                    defaultChannel = selected.copy(isDefault = true)
+                    selectedSettingsChannel = selected.copy(isDefault = true)
+                    refreshLocalState(channel.id)
+
+                    if (BuildConfig.YOUTUBE_API_KEY.isNotBlank()) {
+                        syncArchive(selected.copy(isDefault = true))
+                    }
+                }
+            },
+            onBack = {
+                settingsOpen = false
+                searchOpen = false
+                searchResults = emptyList()
+                searchError = null
+                selectedSettingsChannel = defaultChannel
+                scope.launch {
+                    refreshLocalState(defaultChannel.id)
                 }
             },
         )
@@ -233,6 +425,7 @@ private fun DeepenApp() {
         HomeScreen(
             currentVideo = currentVideo,
             stats = stats,
+            activeChannel = defaultChannel,
             syncing = syncing,
             errorMessage = errorMessage,
             onContinue = {
@@ -242,7 +435,24 @@ private fun DeepenApp() {
             },
             onSync = {
                 scope.launch {
-                    syncArchive()
+                    syncArchive(defaultChannel)
+                }
+            },
+            onSettings = {
+                selectedSettingsChannel = defaultChannel
+                settingsOpen = true
+
+                if (BuildConfig.YOUTUBE_API_KEY.isNotBlank()) {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            YouTubeArchive.refreshChannelMetadata(
+                                apiKey = BuildConfig.YOUTUBE_API_KEY,
+                                channels = featuredChannels,
+                                store = store,
+                            )
+                        }
+                        refreshChannels(defaultChannel.id)
+                    }
                 }
             },
         )
@@ -259,10 +469,12 @@ private fun DeepenApp() {
 private fun HomeScreen(
     currentVideo: VideoItem?,
     stats: JourneyStats,
+    activeChannel: ChannelSource,
     syncing: Boolean,
     errorMessage: String?,
     onContinue: () -> Unit,
     onSync: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val journeyProgress = if (stats.total == 0) {
         0f
@@ -347,15 +559,27 @@ private fun HomeScreen(
         ) {
             when {
                 currentVideo != null -> {
-                    Text(
-                        text = currentVideo.title,
-                        color = Color.White,
-                        fontSize = 31.sp,
-                        lineHeight = 43.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        HomeChannelAvatar(
+                            imageUrl = activeChannel.thumbnailUrl,
+                            contentDescription = activeChannel.displayName,
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Text(
+                            text = currentVideo.title,
+                            color = Color.White,
+                            fontSize = 31.sp,
+                            lineHeight = 43.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -413,17 +637,22 @@ private fun HomeScreen(
 
                             Column {
                                 Text(
-                                    text = "Dr. Paul Gitwaza",
+                                    text = activeChannel.displayName,
                                     color = Color.White,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    text = "@drpaulmgitwaza",
+                                    text = activeChannel.secondaryLabel,
                                     color = Color(0xFFBAC5D3),
                                     fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
+
                         }
                     }
 
@@ -519,6 +748,13 @@ private fun HomeScreen(
             }
         }
 
+        DeepenSettingsButton(
+            onClick = onSettings,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 60.dp, bottom = 42.dp),
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -549,6 +785,90 @@ private fun HomeScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun HomeChannelAvatar(
+    imageUrl: String?,
+    contentDescription: String?,
+) {
+    Box(
+        modifier = Modifier
+            .size(54.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF111D2F)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageUrl.isNullOrBlank()) {
+            Image(
+                painter = painterResource(R.drawable.ic_youtube_white),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(28.dp),
+            )
+        } else {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = contentDescription,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                placeholder = painterResource(R.drawable.ic_youtube_white),
+                error = painterResource(R.drawable.ic_youtube_white),
+                fallback = painterResource(R.drawable.ic_youtube_white),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeepenSettingsButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(50)
+
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .size(42.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) {
+                    Color(0xFFBDEBFF)
+                } else {
+                    Color.White.copy(alpha = 0.18f)
+                },
+                shape = shape,
+            ),
+        scale = ButtonDefaults.scale(
+            scale = 1.0f,
+            focusedScale = 1.10f,
+            pressedScale = 0.96f,
+        ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF0A1525).copy(alpha = 0.92f),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF164F86),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF0E355C),
+            pressedContentColor = Color.White,
+        ),
+        contentPadding = PaddingValues(0.dp),
+    ) {
+        Text(
+            text = "⚙",
+            color = Color.White,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
