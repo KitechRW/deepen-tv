@@ -186,7 +186,10 @@ private fun DeepenApp() {
 
     suspend fun syncArchive(channel: ChannelSource = defaultChannel) {
         if (BuildConfig.YOUTUBE_API_KEY.isBlank()) {
-            if (store.stats(channel.id).total == 0) {
+            val channelTotal = withContext(Dispatchers.IO) {
+                store.stats(channel.id).total
+            }
+            if (channelTotal == 0) {
                 errorMessage = "Add YOUTUBE_API_KEY to build Deepen and load the teaching archive."
             }
             return
@@ -204,8 +207,11 @@ private fun DeepenApp() {
                 )
             }
         }.onSuccess {
+            val activeDefaultId = withContext(Dispatchers.IO) {
+                store.defaultChannel().id
+            }
             refreshChannels(selectedSettingsChannel.id)
-            if (channel.id == defaultChannel.id || channel.id == store.defaultChannel().id) {
+            if (channel.id == activeDefaultId) {
                 refreshLocalState(channel.id)
             }
         }.onFailure { error ->
