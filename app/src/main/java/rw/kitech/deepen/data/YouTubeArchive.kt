@@ -18,6 +18,7 @@ private data class ResolvedChannel(
     val youtubeChannelId: String,
     val title: String,
     val handle: String?,
+    val thumbnailUrl: String?,
     val uploadsPlaylistId: String,
 )
 
@@ -39,6 +40,7 @@ object YouTubeArchive {
             youtubeChannelId = resolved.youtubeChannelId,
             sourceName = resolved.title,
             handle = resolved.handle,
+            thumbnailUrl = resolved.thumbnailUrl,
         )
 
         val hasExistingArchive = store.stats(channel.id).total > 0
@@ -162,6 +164,7 @@ object YouTubeArchive {
         )
 
         val handlesById = mutableMapOf<String, String?>()
+        val thumbnailsById = mutableMapOf<String, String?>()
         val titlesById = mutableMapOf<String, String>()
         val detailItems = details.optJSONArray("items")
         if (detailItems != null) {
@@ -174,9 +177,11 @@ object YouTubeArchive {
                     ?.removePrefix("@")
                     ?.takeIf { it.isNotBlank() }
                 val title = snippet?.optString("title").orEmpty()
+                val thumbnailUrl = snippet?.let(::thumbnailUrl)
 
                 if (id.isNotBlank()) {
                     handlesById[id] = handle
+                    thumbnailsById[id] = thumbnailUrl
                     if (title.isNotBlank()) {
                         titlesById[id] = title
                     }
@@ -189,6 +194,7 @@ object YouTubeArchive {
                 youtubeChannelId = channelId,
                 displayName = titlesById[channelId] ?: searchTitle,
                 handle = handlesById[channelId],
+                thumbnailUrl = thumbnailsById[channelId],
             )
         }
     }
@@ -257,6 +263,7 @@ object YouTubeArchive {
             ?.optString("customUrl")
             ?.removePrefix("@")
             ?.takeIf { it.isNotBlank() }
+        val thumbnailUrl = snippet?.let(::thumbnailUrl)
         val uploads = contentDetails
             ?.optJSONObject("relatedPlaylists")
             ?.optString("uploads")
@@ -270,8 +277,42 @@ object YouTubeArchive {
             youtubeChannelId = youtubeChannelId,
             title = title.ifBlank { selectorValue },
             handle = handle,
+            thumbnailUrl = thumbnailUrl,
             uploadsPlaylistId = uploads,
         )
+    }
+
+    fun refreshChannelMetadata(
+        apiKey: String,
+        channels: List<ChannelSource>,
+        store: VideoStore,
+    ) {
+        if (apiKey.isBlank()) return
+
+        channels.forEach { channel ->
+            runCatching {
+                resolveChannel(apiKey, channel)
+            }.onSuccess { resolved ->
+                store.updateChannelIdentity(
+                    channelId = channel.id,
+                    youtubeChannelId = resolved.youtubeChannelId,
+                    sourceName = resolved.title,
+                    handle = resolved.handle,
+                    thumbnailUrl = resolved.thumbnailUrl,
+                )
+            }
+        }
+    }
+
+    private fun thumbnailUrl(snippet: JSONObject): String? {
+        val thumbnails = snippet.optJSONObject("thumbnails") ?: return null
+        return sequenceOf("high", "medium", "default")
+            .mapNotNull { key ->
+                thumbnails.optJSONObject(key)
+                    ?.optString("url")
+                    ?.takeIf { it.isNotBlank() }
+            }
+            .firstOrNull()
     }
 
     private fun similarityScore(
