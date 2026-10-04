@@ -103,7 +103,7 @@ internal fun ChannelSettingsScreen(
 
             SectionTitle(
                 title = "Featured in Rwanda",
-                subtitle = "Choose a teaching journey",
+                subtitle = "Choose a journey",
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -780,7 +780,7 @@ private fun EmptyChannelsState() {
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = "Search for a preacher, ministry or YouTube channel to add one.",
+            text = "Search for a name, ministry or YouTube channel to add one.",
             color = ChannelSettingsMuted,
             fontSize = 12.sp,
         )
@@ -897,7 +897,7 @@ private fun SearchField(
     ) {
         if (value.isBlank()) {
             Text(
-                text = "Search preacher, ministry or YouTube channel",
+                text = "Search name, ministry or YouTube channel",
                 color = ChannelSettingsMuted,
                 fontSize = 13.sp,
             )
