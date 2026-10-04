@@ -1,9 +1,8 @@
 package rw.kitech.deepen
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,11 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,9 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import coil.compose.AsyncImage
-import androidx.compose.foundation.Image
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
+import coil.compose.AsyncImage
 import rw.kitech.deepen.model.ChannelSearchResult
 import rw.kitech.deepen.model.ChannelSource
 
@@ -76,25 +77,18 @@ internal fun ChannelSettingsScreen(
             .fillMaxSize()
             .background(ChannelSettingsBackground),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color(0xFF020711),
-                            Color(0xFF071225),
-                            Color(0xFF0A1730),
-                        ),
-                    )
-                ),
-        )
+        SettingsAtmosphere()
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 58.dp, vertical = 38.dp),
+                .padding(
+                    start = 46.dp,
+                    end = 46.dp,
+                    top = 28.dp,
+                    bottom = 30.dp,
+                ),
         ) {
             SettingsHeader(
                 searchOpen = searchOpen,
@@ -102,7 +96,7 @@ internal fun ChannelSettingsScreen(
                 onBack = onBack,
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             if (searchOpen) {
                 SearchPanel(
@@ -115,7 +109,7 @@ internal fun ChannelSettingsScreen(
                     onAdd = onAddSearchResult,
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(18.dp))
             }
 
             SelectedChannelPanel(
@@ -124,74 +118,39 @@ internal fun ChannelSettingsScreen(
                 onSetDefault = { onSetDefault(selectedChannel) },
             )
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            Text(
-                text = "Featured in Rwanda",
-                color = Color.White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
+            SectionTitle(
+                title = "Featured in Rwanda",
+                subtitle = "Choose a teaching journey",
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            ChannelRow(
+            FeaturedChannelRow(
                 channels = featuredChannels,
                 selectedChannelId = selectedChannel.id,
                 defaultChannelId = defaultChannel.id,
                 onSelect = onSelectChannel,
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Your Channels",
-                    color = Color.White,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            SectionTitle(
+                title = "Your Channels",
+                subtitle = if (userChannels.isEmpty()) {
+                    "Use Search to add another YouTube channel"
+                } else {
+                    "Channels you added"
+                },
+            )
 
-                if (userChannels.isEmpty()) {
-                    Text(
-                        text = "Search above to add another YouTube channel",
-                        color = ChannelSettingsMuted,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (userChannels.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(86.dp)
-                        .background(
-                            color = ChannelSettingsPanel.copy(alpha = 0.62f),
-                            shape = RoundedCornerShape(14.dp),
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.08f),
-                            shape = RoundedCornerShape(14.dp),
-                        ),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Text(
-                        text = "No personal channels added yet.",
-                        modifier = Modifier.padding(horizontal = 22.dp),
-                        color = ChannelSettingsMuted,
-                        fontSize = 15.sp,
-                    )
-                }
+                EmptyChannelsState()
             } else {
-                ChannelRow(
+                PersonalChannelRow(
                     channels = userChannels,
                     selectedChannelId = selectedChannel.id,
                     defaultChannelId = defaultChannel.id,
@@ -200,6 +159,52 @@ internal fun ChannelSettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SettingsAtmosphere() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF020711),
+                        Color(0xFF061127),
+                        Color(0xFF0A1835),
+                        Color(0xFF061020),
+                    ),
+                ),
+            ),
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        ChannelSettingsBlue.copy(alpha = 0.20f),
+                        Color.Transparent,
+                    ),
+                    radius = 1050f,
+                ),
+            ),
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color(0xFF020711).copy(alpha = 0.15f),
+                        Color(0xFF020711).copy(alpha = 0.62f),
+                    ),
+                ),
+            ),
+    )
 }
 
 @Composable
@@ -217,30 +222,60 @@ private fun SettingsHeader(
             Text(
                 text = "SETTINGS",
                 color = ChannelSettingsBlue,
-                fontSize = 13.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
             )
+
+            Spacer(modifier = Modifier.height(1.dp))
+
             Text(
                 text = "Channels",
                 color = Color.White,
-                fontSize = 31.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SettingsPillButton(
                 label = if (searchOpen) "CLOSE SEARCH" else "⌕  SEARCH",
                 onClick = onSearchToggle,
             )
+
             SettingsPillButton(
                 label = "←  BACK",
                 onClick = onBack,
             )
         }
+    }
+}
+
+@Composable
+private fun SectionTitle(
+    title: String,
+    subtitle: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        Text(
+            text = subtitle,
+            color = ChannelSettingsMuted.copy(alpha = 0.86f),
+            fontSize = 12.sp,
+        )
     }
 }
 
@@ -253,37 +288,48 @@ private fun SelectedChannelPanel(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
+            .height(116.dp)
             .background(
-                color = Color(0xFF0A1525).copy(alpha = 0.94f),
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF0A1628).copy(alpha = 0.94f),
+                        Color(0xFF0C1B32).copy(alpha = 0.88f),
+                        Color(0xFF0A1424).copy(alpha = 0.90f),
+                    ),
+                ),
                 shape = RoundedCornerShape(18.dp),
             )
             .border(
                 width = 1.dp,
-                color = ChannelSettingsBlue.copy(alpha = 0.58f),
+                color = Color.White.copy(alpha = 0.09f),
                 shape = RoundedCornerShape(18.dp),
             )
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 22.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ChannelAvatar(
                 imageUrl = channel.thumbnailUrl,
                 contentDescription = channel.displayName,
-                size = 58,
+                size = 72,
+                ring = true,
             )
 
             Spacer(modifier = Modifier.width(18.dp))
 
-            Column {
+            Column(
+                modifier = Modifier.weight(1f),
+            ) {
                 Text(
-                    text = "Selected channel",
-                    color = ChannelSettingsMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "SELECTED CHANNEL",
+                    color = ChannelSettingsBlue.copy(alpha = 0.90f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.9.sp,
                 )
 
                 Spacer(modifier = Modifier.height(5.dp))
@@ -291,7 +337,7 @@ private fun SelectedChannelPanel(
                 Text(
                     text = channel.displayName,
                     color = Color.White,
-                    fontSize = 24.sp,
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -302,12 +348,14 @@ private fun SelectedChannelPanel(
                 Text(
                     text = channel.secondaryLabel,
                     color = ChannelSettingsMuted,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+
+        Spacer(modifier = Modifier.width(20.dp))
 
         DefaultButton(
             isDefault = isDefault,
@@ -317,14 +365,38 @@ private fun SelectedChannelPanel(
 }
 
 @Composable
-private fun ChannelRow(
+private fun FeaturedChannelRow(
+    channels: List<ChannelSource>,
+    selectedChannelId: String,
+    defaultChannelId: String,
+    onSelect: (ChannelSource) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        channels.take(5).forEach { channel ->
+            ChannelCard(
+                channel = channel,
+                selected = channel.id == selectedChannelId,
+                isDefault = channel.id == defaultChannelId,
+                onClick = { onSelect(channel) },
+                modifier = Modifier.weight(1f),
+                compact = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PersonalChannelRow(
     channels: List<ChannelSource>,
     selectedChannelId: String,
     defaultChannelId: String,
     onSelect: (ChannelSource) -> Unit,
 ) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(end = 12.dp),
     ) {
         items(
@@ -336,6 +408,8 @@ private fun ChannelRow(
                 selected = channel.id == selectedChannelId,
                 isDefault = channel.id == defaultChannelId,
                 onClick = { onSelect(channel) },
+                modifier = Modifier.width(230.dp),
+                compact = true,
             )
         }
     }
@@ -347,22 +421,27 @@ private fun ChannelCard(
     selected: Boolean,
     isDefault: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier,
+    compact: Boolean,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(15.dp)
 
     Button(
         onClick = onClick,
-        modifier = Modifier
-            .width(220.dp)
-            .height(108.dp)
+        modifier = modifier
+            .height(if (compact) 104.dp else 122.dp)
             .onFocusChanged { focused = it.isFocused }
             .border(
-                width = if (selected || focused) 2.dp else 1.dp,
+                width = when {
+                    focused -> 2.dp
+                    selected -> 1.5.dp
+                    else -> 1.dp
+                },
                 color = when {
                     focused -> Color(0xFFBDEBFF)
-                    selected -> ChannelSettingsBlue
-                    else -> Color.White.copy(alpha = 0.10f)
+                    selected -> ChannelSettingsBlue.copy(alpha = 0.95f)
+                    else -> Color.White.copy(alpha = 0.055f)
                 },
                 shape = shape,
             ),
@@ -373,18 +452,21 @@ private fun ChannelCard(
         ),
         scale = ButtonDefaults.scale(
             scale = 1.0f,
-            focusedScale = 1.04f,
-            pressedScale = 0.99f,
+            focusedScale = 1.045f,
+            pressedScale = 0.985f,
         ),
         colors = ButtonDefaults.colors(
-            containerColor = ChannelSettingsPanel,
+            containerColor = ChannelSettingsPanel.copy(alpha = 0.88f),
             contentColor = Color.White,
-            focusedContainerColor = Color(0xFF142A45),
+            focusedContainerColor = Color(0xFF153354),
             focusedContentColor = Color.White,
-            pressedContainerColor = Color(0xFF10233A),
+            pressedContainerColor = Color(0xFF102844),
             pressedContentColor = Color.White,
         ),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 13.dp else 14.dp,
+            vertical = if (compact) 11.dp else 13.dp,
+        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -392,52 +474,107 @@ private fun ChannelCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
                 ChannelAvatar(
                     imageUrl = channel.thumbnailUrl,
                     contentDescription = channel.displayName,
-                    size = 30,
+                    size = if (compact) 34 else 42,
+                    ring = false,
                 )
 
-                Text(
-                    text = when {
-                        isDefault -> "★"
-                        selected -> "●"
-                        else -> "○"
-                    },
-                    color = if (isDefault || selected) {
-                        ChannelSettingsBlue
-                    } else {
-                        ChannelSettingsMuted
-                    },
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+                ChannelStateIcon(
+                    selected = selected,
+                    isDefault = isDefault,
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(if (compact) 7.dp else 9.dp))
 
             Text(
                 text = channel.displayName,
                 color = Color.White,
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
+                fontSize = if (compact) 13.sp else 14.sp,
+                lineHeight = if (compact) 16.sp else 17.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Text(
                 text = channel.secondaryLabel,
-                color = ChannelSettingsMuted,
-                fontSize = 11.sp,
+                color = ChannelSettingsMuted.copy(alpha = 0.88f),
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+@Composable
+private fun ChannelStateIcon(
+    selected: Boolean,
+    isDefault: Boolean,
+) {
+    when {
+        isDefault -> {
+            Text(
+                text = "★",
+                color = ChannelSettingsBlue,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        selected -> {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(ChannelSettingsBlue),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyChannelsState() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(62.dp)
+            .background(
+                color = Color(0xFF0B1422).copy(alpha = 0.58f),
+                shape = RoundedCornerShape(14.dp),
+            )
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "No personal channels yet",
+            color = Color.White.copy(alpha = 0.76f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = "•",
+            color = ChannelSettingsBlue,
+            fontSize = 12.sp,
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = "Search for a preacher, ministry or YouTube channel to add one.",
+            color = ChannelSettingsMuted,
+            fontSize = 12.sp,
+        )
     }
 }
 
@@ -455,15 +592,20 @@ private fun SearchPanel(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                color = Color(0xFF081221).copy(alpha = 0.96f),
-                shape = RoundedCornerShape(16.dp),
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color(0xFF081422).copy(alpha = 0.94f),
+                        Color(0xFF0B1A2D).copy(alpha = 0.92f),
+                    ),
+                ),
+                shape = RoundedCornerShape(15.dp),
             )
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.10f),
-                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.07f),
+                shape = RoundedCornerShape(15.dp),
             )
-            .padding(18.dp),
+            .padding(14.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -476,29 +618,30 @@ private fun SearchPanel(
                 modifier = Modifier.weight(1f),
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             SettingsPillButton(
                 label = if (searching) "SEARCHING…" else "SEARCH",
                 onClick = onSearch,
                 enabled = !searching && query.isNotBlank(),
+                emphasized = true,
             )
         }
 
         error?.let { message ->
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = message,
-                color = Color(0xFFFF8A80),
-                fontSize = 13.sp,
+                color = Color(0xFFFF9A91),
+                fontSize = 12.sp,
             )
         }
 
         if (results.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 items(
                     items = results,
@@ -526,9 +669,9 @@ private fun SearchField(
 
     Box(
         modifier = modifier
-            .height(48.dp)
+            .height(44.dp)
             .background(
-                color = Color(0xFF111A27),
+                color = Color(0xFF0B1421).copy(alpha = 0.92f),
                 shape = shape,
             )
             .border(
@@ -536,18 +679,18 @@ private fun SearchField(
                 color = if (focused) {
                     Color(0xFF8FD6FF)
                 } else {
-                    Color.White.copy(alpha = 0.16f)
+                    Color.White.copy(alpha = 0.10f)
                 },
                 shape = shape,
             )
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 17.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         if (value.isBlank()) {
             Text(
                 text = "Search preacher, ministry or YouTube channel",
                 color = ChannelSettingsMuted,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
             )
         }
 
@@ -560,7 +703,7 @@ private fun SearchField(
             singleLine = true,
             textStyle = TextStyle(
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
             ),
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Search,
@@ -578,20 +721,20 @@ private fun SearchResultCard(
     onAdd: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(13.dp)
 
     Button(
         onClick = onAdd,
         modifier = Modifier
-            .width(235.dp)
-            .height(78.dp)
+            .width(225.dp)
+            .height(72.dp)
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 2.dp else 1.dp,
                 color = if (focused) {
                     Color(0xFFBDEBFF)
                 } else {
-                    Color.White.copy(alpha = 0.10f)
+                    Color.White.copy(alpha = 0.06f)
                 },
                 shape = shape,
             ),
@@ -600,15 +743,20 @@ private fun SearchResultCard(
             focusedShape = shape,
             pressedShape = shape,
         ),
+        scale = ButtonDefaults.scale(
+            scale = 1.0f,
+            focusedScale = 1.035f,
+            pressedScale = 0.985f,
+        ),
         colors = ButtonDefaults.colors(
-            containerColor = ChannelSettingsPanel,
+            containerColor = ChannelSettingsPanel.copy(alpha = 0.90f),
             contentColor = Color.White,
-            focusedContainerColor = Color(0xFF142A45),
+            focusedContainerColor = Color(0xFF153354),
             focusedContentColor = Color.White,
-            pressedContainerColor = Color(0xFF10233A),
+            pressedContainerColor = Color(0xFF102844),
             pressedContentColor = Color.White,
         ),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -617,31 +765,38 @@ private fun SearchResultCard(
             ChannelAvatar(
                 imageUrl = result.thumbnailUrl,
                 contentDescription = result.displayName,
-                size = 38,
+                size = 36,
+                ring = false,
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(9.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
             ) {
-            Text(
-                text = result.displayName,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = result.handle
-                    ?.let { handle -> if (handle.startsWith("@")) handle else "@" + handle }
-                    ?: "ADD CHANNEL",
-                color = if (result.handle == null) ChannelSettingsBlue else ChannelSettingsMuted,
-                fontSize = 11.sp,
-                maxLines = 1,
-            )
+                Text(
+                    text = result.displayName,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = result.handle
+                        ?.let { handle -> if (handle.startsWith("@")) handle else "@$handle" }
+                        ?: "ADD CHANNEL",
+                    color = if (result.handle == null) {
+                        ChannelSettingsBlue
+                    } else {
+                        ChannelSettingsMuted
+                    },
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -652,19 +807,31 @@ private fun ChannelAvatar(
     imageUrl: String?,
     contentDescription: String?,
     size: Int,
+    ring: Boolean,
 ) {
     Box(
         modifier = Modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(Color(0xFF111D2F)),
+            .background(Color(0xFF111D2F))
+            .then(
+                if (ring) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = ChannelSettingsBlue.copy(alpha = 0.34f),
+                        shape = CircleShape,
+                    )
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (imageUrl.isNullOrBlank()) {
             Image(
                 painter = painterResource(R.drawable.ic_youtube_white),
                 contentDescription = contentDescription,
-                modifier = Modifier.size((size * 0.52f).dp),
+                modifier = Modifier.size((size * 0.50f).dp),
             )
         } else {
             AsyncImage(
@@ -676,6 +843,7 @@ private fun ChannelAvatar(
                 placeholder = painterResource(R.drawable.ic_youtube_white),
                 error = painterResource(R.drawable.ic_youtube_white),
                 fallback = painterResource(R.drawable.ic_youtube_white),
+                contentScale = ContentScale.Crop,
             )
         }
     }
@@ -713,8 +881,8 @@ private fun SettingsPillButton(
                 width = if (focused) 2.dp else 1.dp,
                 color = when {
                     focused -> Color(0xFFBDEBFF)
-                    emphasized -> ChannelSettingsBlue.copy(alpha = 0.72f)
-                    else -> Color.White.copy(alpha = 0.16f)
+                    emphasized -> ChannelSettingsBlue.copy(alpha = 0.35f)
+                    else -> Color.White.copy(alpha = 0.11f)
                 },
                 shape = shape,
             ),
@@ -729,30 +897,38 @@ private fun SettingsPillButton(
             pressedScale = 0.98f,
         ),
         colors = ButtonDefaults.colors(
-            containerColor = if (emphasized) Color(0xFF123B66) else Color(0xFF0A1525),
+            containerColor = if (emphasized) {
+                Color(0xFF103357).copy(alpha = 0.92f)
+            } else {
+                Color(0xFF081321).copy(alpha = 0.80f)
+            },
             contentColor = Color.White,
-            focusedContainerColor = if (emphasized) Color(0xFF1B6EB4) else Color(0xFF164F86),
+            focusedContainerColor = if (emphasized) {
+                Color(0xFF1B6EB4)
+            } else {
+                Color(0xFF164F86)
+            },
             focusedContentColor = Color.White,
             pressedContainerColor = Color(0xFF0E355C),
             pressedContentColor = Color.White,
-            disabledContainerColor = Color(0xFF111A25),
-            disabledContentColor = Color(0xFF7F91A5),
+            disabledContainerColor = Color(0xFF0B1320).copy(alpha = 0.66f),
+            disabledContentColor = Color(0xFF8092A4),
         ),
         contentPadding = PaddingValues(
-            horizontal = 18.dp,
-            vertical = 10.dp,
+            horizontal = 17.dp,
+            vertical = 9.dp,
         ),
     ) {
         Text(
             text = label,
-            color = if (enabled) Color.White else Color(0xFF7F91A5),
-            fontSize = 13.sp,
+            color = if (enabled) Color.White else Color(0xFF8092A4),
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )
     }
 }
 
 private val ChannelSettingsBlue = Color(0xFF3399FF)
-private val ChannelSettingsBackground = Color(0xFF080A0D)
-private val ChannelSettingsPanel = Color(0xFF101A28)
-private val ChannelSettingsMuted = Color(0xFFA5AFBC)
+private val ChannelSettingsBackground = Color(0xFF020711)
+private val ChannelSettingsPanel = Color(0xFF0D1828)
+private val ChannelSettingsMuted = Color(0xFFA8B4C2)
