@@ -257,6 +257,18 @@ internal fun ChannelSearchScreen(
         }
     }
 
+    fun cancelInlineRecognition() {
+        if (isListening) {
+            speechRecognizer?.cancel()
+            isListening = false
+        }
+    }
+
+    fun submitSearch() {
+        cancelInlineRecognition()
+        onSearch()
+    }
+
     LaunchedEffect(query) {
         if (query != inputText) {
             inputText = query
@@ -314,6 +326,7 @@ internal fun ChannelSearchScreen(
                 SearchTextField(
                     value = inputText,
                     onValueChange = { value ->
+                        cancelInlineRecognition()
                         inputText = value
                         voiceAlternatives = emptyList()
                         voiceError = null
@@ -321,13 +334,14 @@ internal fun ChannelSearchScreen(
                     },
                     onVoiceClick = ::startVoiceSearch,
                     onClear = {
+                        cancelInlineRecognition()
                         inputText = ""
                         voiceAlternatives = emptyList()
                         voiceError = null
                         keyboardController?.hide()
                         onClear()
                     },
-                    onSearch = onSearch,
+                    onSearch = ::submitSearch,
                     listening = isListening,
                     voiceFocusRequester = voiceFocusRequester,
                     textFocusRequester = textFocusRequester,
@@ -338,7 +352,7 @@ internal fun ChannelSearchScreen(
 
                 SearchActionButton(
                     label = if (searching) "SEARCHING…" else "SEARCH",
-                    onClick = onSearch,
+                    onClick = ::submitSearch,
                     enabled = inputText.isNotBlank() && !searching,
                     emphasized = true,
                 )
