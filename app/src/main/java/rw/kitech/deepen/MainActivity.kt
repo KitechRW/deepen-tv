@@ -1374,6 +1374,7 @@ private fun PlayerScreen(
                     }
 
                     if (
+                        stateToApply == "STARTING" ||
                         stateToApply == "PLAYING" ||
                         stateToApply == "PAUSED" ||
                         stateToApply == "BUFFERING" ||
