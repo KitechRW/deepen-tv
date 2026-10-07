@@ -1343,16 +1343,18 @@ private fun PlayerScreen(
                     }
                 },
                 onPlaybackState = { state, telemetryPosition, telemetryDuration ->
-                    if (state == "PLAYING") {
-                        hasPlaybackStarted = true
+                    when (state) {
+                        "STARTING", "PLAYING" -> hasPlaybackStarted = true
+                        "AUTOPLAY_BLOCKED" -> hasPlaybackStarted = false
                     }
+                    val reportedState = if (state == "AUTOPLAY_BLOCKED") "READY" else state
                     val stateToApply = if (
                         hasPlaybackStarted &&
-                        (state == "LOADING" || state == "READY")
+                        (reportedState == "LOADING" || reportedState == "READY")
                     ) {
                         playbackState
                     } else {
-                        state
+                        reportedState
                     }
                     val syncedDuration = if (telemetryDuration > 0.0) {
                         telemetryDuration
@@ -2462,6 +2464,9 @@ private fun youtubePlayerHtml(
 
                     event.target.playVideo();
 
+                    // Start the local counter from the play request; YouTube's
+                    // state events will resync or stop it as playback changes.
+                    reportPlaybackState('STARTING');
                     reportProgress();
                 }
 
@@ -2520,7 +2525,7 @@ private fun youtubePlayerHtml(
                 }
 
                 function onAutoplayBlocked() {
-                    reportPlaybackState('READY');
+                    reportPlaybackState('AUTOPLAY_BLOCKED');
                 }
 
                 function playVideo() {
