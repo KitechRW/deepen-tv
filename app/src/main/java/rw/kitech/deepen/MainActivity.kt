@@ -1212,7 +1212,7 @@ private fun PlayerScreen(
     }
 
     LaunchedEffect(playbackState, video.videoId) {
-        while (playbackState == "PLAYING") {
+        while (playbackState == "PLAYING" || playbackState == "BUFFERING") {
             delay(1000)
             playbackPosition = if (durationSeconds > 0.0) {
                 (playbackPosition + 1.0).coerceAtMost(durationSeconds)
