@@ -2536,6 +2536,8 @@ private fun youtubePlayerHtml(
                 function pauseVideo() {
                     if (!player || typeof player.pauseVideo !== 'function') return;
                     player.pauseVideo();
+                    reportPlaybackState('PAUSED');
+                    reportProgress();
                 }
 
                 function togglePlayback() {
