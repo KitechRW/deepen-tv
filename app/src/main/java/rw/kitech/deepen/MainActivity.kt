@@ -1097,6 +1097,9 @@ private fun PlayerScreen(
     var playbackState by remember(video.videoId) {
         mutableStateOf("LOADING")
     }
+    var hasPlaybackStarted by remember(video.videoId) {
+        mutableStateOf(false)
+    }
     var playbackError by remember(video.videoId) {
         mutableStateOf<String?>(null)
     }
@@ -1211,13 +1214,25 @@ private fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(playbackState, video.videoId) {
-        while (playbackState == "PLAYING" || playbackState == "BUFFERING") {
+    LaunchedEffect(hasPlaybackStarted, playbackState, video.videoId) {
+        while (
+            hasPlaybackStarted &&
+            playbackState != "PAUSED" &&
+            playbackState != "ENDED" &&
+            playbackState != "ERROR"
+        ) {
             delay(1000)
-            playbackPosition = if (durationSeconds > 0.0) {
-                (playbackPosition + 1.0).coerceAtMost(durationSeconds)
-            } else {
-                playbackPosition + 1.0
+            if (
+                hasPlaybackStarted &&
+                playbackState != "PAUSED" &&
+                playbackState != "ENDED" &&
+                playbackState != "ERROR"
+            ) {
+                playbackPosition = if (durationSeconds > 0.0) {
+                    (playbackPosition + 1.0).coerceAtMost(durationSeconds)
+                } else {
+                    playbackPosition + 1.0
+                }
             }
         }
     }
@@ -1314,6 +1329,7 @@ private fun PlayerScreen(
                         position > 0.0 &&
                         (playbackState == "LOADING" || playbackState == "READY")
                     ) {
+                        hasPlaybackStarted = true
                         playbackState = "PLAYING"
                         playbackError = null
                     }
@@ -1327,6 +1343,17 @@ private fun PlayerScreen(
                     }
                 },
                 onPlaybackState = { state, telemetryPosition, telemetryDuration ->
+                    if (state == "PLAYING") {
+                        hasPlaybackStarted = true
+                    }
+                    val stateToApply = if (
+                        hasPlaybackStarted &&
+                        (state == "LOADING" || state == "READY")
+                    ) {
+                        playbackState
+                    } else {
+                        state
+                    }
                     val syncedDuration = if (telemetryDuration > 0.0) {
                         telemetryDuration
                     } else {
@@ -1343,20 +1370,20 @@ private fun PlayerScreen(
                     }
 
                     if (
-                        state == "PLAYING" ||
-                        state == "PAUSED" ||
-                        state == "BUFFERING" ||
-                        state == "ENDED"
+                        stateToApply == "PLAYING" ||
+                        stateToApply == "PAUSED" ||
+                        stateToApply == "BUFFERING" ||
+                        stateToApply == "ENDED"
                     ) {
                         playbackPosition = syncedPosition
                     }
 
-                    playbackState = state
-                    if (state == "PLAYING") {
+                    playbackState = stateToApply
+                    if (stateToApply == "PLAYING") {
                         playbackError = null
                     }
 
-                    if (state == "PAUSED") {
+                    if (stateToApply == "PAUSED") {
                         controlsForcedHidden = false
                         overlayVisible = true
                         controlFeedback = null
@@ -1638,6 +1665,7 @@ private fun PlayerScreen(
         }
 
         if (
+            !hasPlaybackStarted &&
             playbackError == null &&
             (playbackState == "LOADING" || playbackState == "READY")
         ) {
