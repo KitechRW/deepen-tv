@@ -2277,7 +2277,7 @@ private fun YouTubePlayer(
                         videoId = video.videoId,
                         onProgress = onProgress,
                         onBufferTelemetry = onBufferTelemetry,
-                        onPlaybackState = onPlaybackState,
+                        playbackStateCallback = onPlaybackState,
                         onPlaybackError = onPlaybackError,
                         onEnded = onEnded,
                     ),
@@ -2321,7 +2321,7 @@ private class PlayerBridge(
     private val videoId: String,
     private val onProgress: (String, Double, Double) -> Unit,
     private val onBufferTelemetry: (Double, Double, Double) -> Unit,
-    private val onPlaybackState: (String, Double, Double) -> Unit,
+    private val playbackStateCallback: (String, Double, Double) -> Unit,
     private val onPlaybackError: (String) -> Unit,
     private val onEnded: (String) -> Unit,
 ) {
@@ -2346,7 +2346,7 @@ private class PlayerBridge(
         durationSeconds: Double,
     ) {
         mainHandler.post {
-            onPlaybackState(
+            playbackStateCallback(
                 state,
                 currentSeconds,
                 durationSeconds,
