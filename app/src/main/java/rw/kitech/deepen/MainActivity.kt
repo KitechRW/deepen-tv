@@ -1327,14 +1327,6 @@ private fun PlayerScreen(
                         playbackPosition = position
                     }
 
-                    if (
-                        position > 0.0 &&
-                        (playbackState == "LOADING" || playbackState == "READY")
-                    ) {
-                        hasPlaybackStarted = true
-                        playbackState = "PLAYING"
-                        playbackError = null
-                    }
                 },
                 onBufferTelemetry = { current, duration, loaded ->
                     loadedFraction = loaded.coerceIn(0.0, 1.0)
@@ -1346,7 +1338,7 @@ private fun PlayerScreen(
                 },
                 onPlaybackState = { state, telemetryPosition, telemetryDuration ->
                     when (state) {
-                        "STARTING", "PLAYING" -> hasPlaybackStarted = true
+                        "PLAYING" -> hasPlaybackStarted = true
                         "AUTOPLAY_BLOCKED" -> hasPlaybackStarted = false
                     }
                     val reportedState = if (state == "AUTOPLAY_BLOCKED") "READY" else state
@@ -1373,13 +1365,13 @@ private fun PlayerScreen(
                         durationSeconds = telemetryDuration
                     }
 
-                    if (
-                        stateToApply == "STARTING" ||
-                        stateToApply == "PLAYING" ||
-                        stateToApply == "PAUSED" ||
-                        stateToApply == "BUFFERING" ||
-                        stateToApply == "ENDED"
-                    ) {
+                    val shouldSyncYouTubePosition =
+                        reportedState == "PLAYING" ||
+                            reportedState == "PAUSED" ||
+                            reportedState == "BUFFERING" ||
+                            reportedState == "ENDED" ||
+                            (reportedState == "READY" && !hasPlaybackStarted)
+                    if (shouldSyncYouTubePosition) {
                         playbackPosition = syncedPosition
                     }
 
@@ -2467,9 +2459,8 @@ private fun youtubePlayerHtml(
 
                     event.target.playVideo();
 
-                    // Start the local counter from the play request; YouTube's
-                    // state events will resync or stop it as playback changes.
-                    reportPlaybackState('STARTING');
+                    // Seed the displayed position from YouTube. The actual
+                    // PLAYING event starts the local ticker.
                     reportProgress();
                 }
 
