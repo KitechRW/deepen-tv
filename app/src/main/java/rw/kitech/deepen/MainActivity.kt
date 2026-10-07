@@ -1218,6 +1218,7 @@ private fun PlayerScreen(
         while (
             hasPlaybackStarted &&
             playbackState != "PAUSED" &&
+            playbackState != "PAUSE_REQUESTED" &&
             playbackState != "ENDED" &&
             playbackState != "ERROR"
         ) {
@@ -1225,6 +1226,7 @@ private fun PlayerScreen(
             if (
                 hasPlaybackStarted &&
                 playbackState != "PAUSED" &&
+                playbackState != "PAUSE_REQUESTED" &&
                 playbackState != "ENDED" &&
                 playbackState != "ERROR"
             ) {
@@ -2535,9 +2537,23 @@ private fun youtubePlayerHtml(
 
                 function pauseVideo() {
                     if (!player || typeof player.pauseVideo !== 'function') return;
+
+                    // Stop the local ticker immediately, without replacing the
+                    // position from YouTube's confirmed paused position.
+                    AndroidBridge.onPlaybackState('PAUSE_REQUESTED', 0, 0);
                     player.pauseVideo();
-                    reportPlaybackState('PAUSED');
-                    reportProgress();
+
+                    // Read the authoritative position after YouTube settles.
+                    setTimeout(function() {
+                        if (
+                            player &&
+                            typeof player.getPlayerState === 'function' &&
+                            player.getPlayerState() === YT.PlayerState.PAUSED
+                        ) {
+                            reportPlaybackState('PAUSED');
+                            reportProgress();
+                        }
+                    }, 100);
                 }
 
                 function togglePlayback() {
