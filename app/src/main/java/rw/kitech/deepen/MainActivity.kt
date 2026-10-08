@@ -15,6 +15,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -734,27 +736,8 @@ private fun HomeScreen(
                     ) {
                         DeepenPlayButton(
                             onClick = onContinue,
+                            resumePositionSeconds = currentVideo.progressSeconds,
                         )
-
-                        if (currentVideo.progressSeconds > 1.0) {
-                            Spacer(modifier = Modifier.width(22.dp))
-
-                            Box(
-                                modifier = Modifier
-                                    .width(1.dp)
-                                    .height(42.dp)
-                                    .background(Color.White.copy(alpha = 0.32f)),
-                            )
-
-                            Spacer(modifier = Modifier.width(22.dp))
-
-                            Text(
-                                text = "Resume · ${formatPlaybackTime(currentVideo.progressSeconds)}",
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
                     }
                 }
 
@@ -937,70 +920,101 @@ private fun DeepenSettingsButton(
 @Composable
 private fun DeepenPlayButton(
     onClick: () -> Unit,
+    resumePositionSeconds: Double,
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val pill = RoundedCornerShape(50)
+    val shape = RoundedCornerShape(20.dp)
+    val hasResumePosition = resumePositionSeconds > 1.0
 
-    MaterialTheme(
-        colorScheme = MaterialTheme.colorScheme.copy(
-            surfaceVariant = Color(0xFF208BFF),
-            onSurface = Color.White,
-            inverseSurface = Color(0xFF48B7FF),
-            inverseOnSurface = Color.White,
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .onFocusChanged { focused = it.isFocused }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) {
+                    Color(0xFFBDEBFF)
+                } else {
+                    DeepenBlue.copy(alpha = 0.82f)
+                },
+                shape = shape,
+            ),
+        scale = ButtonDefaults.scale(
+            scale = 1.0f,
+            focusedScale = 1.02f,
+            pressedScale = 0.98f,
+        ),
+        shape = ButtonDefaults.shape(
+            shape = shape,
+            focusedShape = shape,
+            pressedShape = shape,
+        ),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF173A63),
+            contentColor = Color.White,
+            focusedContainerColor = Color(0xFF173A63),
+            focusedContentColor = Color.White,
+            pressedContainerColor = Color(0xFF123052),
+            pressedContentColor = Color.White,
+            disabledContainerColor = Color(0xFF31516E),
+            disabledContentColor = Color(0xFFB8C7D6),
+        ),
+        contentPadding = PaddingValues(
+            horizontal = 20.dp,
+            vertical = 12.dp,
         ),
     ) {
-        Button(
-            onClick = onClick,
-            modifier = modifier
-                .onFocusChanged { focused = it.isFocused }
-                .border(
-                    width = if (focused) 2.dp else 1.dp,
-                    color = if (focused) {
-                        Color(0xFFBDEBFF)
-                    } else {
-                        Color.White.copy(alpha = 0.10f)
-                    },
-                    shape = pill,
-                ),
-            scale = ButtonDefaults.scale(
-                scale = 1.0f,
-                focusedScale = 1.06f,
-                pressedScale = 0.98f,
-            ),
-            shape = ButtonDefaults.shape(
-                shape = pill,
-                focusedShape = pill,
-                pressedShape = pill,
-            ),
-            colors = ButtonDefaults.colors(
-                containerColor = Color(0xFF208BFF),
-                contentColor = Color.White,
-                focusedContainerColor = Color(0xFF35B9FF),
-                focusedContentColor = Color.White,
-                pressedContainerColor = Color(0xFF1378E8),
-                pressedContentColor = Color.White,
-                disabledContainerColor = Color(0xFF31516E),
-                disabledContentColor = Color(0xFFB8C7D6),
-            ),
-            contentPadding = PaddingValues(
-                horizontal = 28.dp,
-                vertical = 15.dp,
-            ),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "▶",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.width(11.dp))
-            Text(
-                text = "PLAY",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(DeepenBlue),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(modifier = Modifier.size(17.dp)) {
+                    val playTriangle = Path().apply {
+                        moveTo(size.width * 0.22f, size.height * 0.08f)
+                        lineTo(size.width * 0.88f, size.height * 0.5f)
+                        lineTo(size.width * 0.22f, size.height * 0.92f)
+                        close()
+                    }
+                    drawPath(playTriangle, Color.White)
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    text = if (hasResumePosition) {
+                        "CONTINUE WATCHING"
+                    } else {
+                        "PLAY NEXT MESSAGE"
+                    },
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.25.sp,
+                    maxLines = 1,
+                )
+                Text(
+                    text = if (hasResumePosition) {
+                        "Resume at ${formatPlaybackTime(resumePositionSeconds)}"
+                    } else {
+                        "Start from the beginning"
+                    },
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
